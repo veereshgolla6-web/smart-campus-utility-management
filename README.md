@@ -2,6 +2,17 @@
 
 A Python/Tkinter campus utility management system for resources, maintenance, complaints, usage, reports, analytics, alerts, backups, audit history, administration, and dashboard monitoring.
 
+## Version 17 — System Notifications & Notification Center
+- Dedicated Notifications tab
+- Automatic out-of-service resource notifications
+- Overdue and upcoming maintenance notifications
+- Invalid maintenance-date notifications
+- High/Critical unresolved complaint notifications
+- Read/unread notification state
+- Mark All as Read control
+- Notification history stored in CSV
+- Duplicate notification prevention
+
 ## Version 16 — User Profile & Session Controls
 - My Profile panel
 - Display-name update with validation
