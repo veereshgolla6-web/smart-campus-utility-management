@@ -1655,3 +1655,8 @@ class SmartCampusApp(tk.Tk):
         messagebox.showinfo("Export Complete","Filtered reports were generated successfully in the reports folder.")
 
 
+
+
+if __name__ == "__main__":
+    app = SmartCampusApp()
+    app.mainloop()
