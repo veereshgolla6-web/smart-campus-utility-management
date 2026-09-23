@@ -1,26 +1,42 @@
-# Smart Campus Utility Management and Resource Tracking System Using Python
+# Smart Campus Utility Management System - Version 4
 
-A Python application for managing campus resources, usage, maintenance complaints, priorities, assignments and reports.
+Version 4 extends the Python/Tkinter application into a more complete campus resource operations system.
 
-## Features
-- Admin and Faculty login
-- Resource management and availability
-- Maintenance complaint registration
-- Complaint categories and priority levels
-- Complaint status and assignment
-- Resource usage tracking
-- CSV file storage
-- Dashboard
-- Exception handling and object-oriented programming
+## Version 4 features
+- Role-aware interface for Admin and Faculty users
+- Admin-only user management
+- Add campus users with duplicate-username validation
+- Resource status workflow: Available, In Use, Maintenance, Out of Service
+- Resource search and filtering
+- Complaint search, assignment, and status workflow
+- Resource usage recording automatically marks an available resource as In Use
+- Release Resource workflow returns an in-use resource to Available
+- Live dashboard counters
+- Reports with resource status, complaint status/priority, usage totals, and resource utilization
+- CSV report export
+- Local CSV persistence with no external Python packages
 
-## Run
-```bash
-python main.py
-```
-
-Demo accounts:
+## Demo accounts
 - Admin: admin / admin123
 - Faculty: faculty / faculty123
 
-## Python concepts
-Decision making, loops, strings, lists, tuples, sets, dictionaries, functions, file handling, CSV, exception handling and OOP.
+## Run
+    python app.py
+
+## Project structure
+smart-campus-utility-management/
+├── app.py
+├── main.py
+├── models.py
+├── storage.py
+├── data/
+│   ├── users.csv
+│   ├── resources.csv
+│   ├── complaints.csv
+│   └── usage.csv
+├── reports/
+├── requirements.txt
+└── README.md
+
+## Python concepts demonstrated
+Decision making, loops, strings, lists, tuples, dictionaries, functions, file handling, exception-safe user input handling, CSV persistence, dataclasses/OOP, Tkinter GUI, and modular design.
