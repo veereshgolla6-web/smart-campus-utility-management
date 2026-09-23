@@ -63,6 +63,7 @@ class SmartCampusApp(tk.Tk):
         for x in complaints:
             if x.get("priority") in ("High","Critical") and x.get("status") not in ("Resolved","Closed"):
                 add("COMPLAINT","Priority Complaint",f"{x.get('complaint_id','')} is {x.get('priority','')} priority and unresolved.")
+    def audit(self,action,details=""):
         append_csv("audit.csv",AUDIT_HEADERS,{"timestamp":datetime.now().strftime("%Y-%m-%d %H:%M:%S"),"username":self.user.username if self.user else "SYSTEM","role":self.user.role if self.user else "SYSTEM","action":action,"details":details})
 
     def backup_data(self):
