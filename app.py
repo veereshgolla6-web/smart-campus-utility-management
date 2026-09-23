@@ -255,10 +255,48 @@ class SmartCampusApp(tk.Tk):
         tk.Button(bar,text="Restore Backup",command=self.restore_data,bg="#376a92",fg="white",bd=0,padx=15,pady=8).pack(side="left",padx=8)
 
     def build_users(self):
-        bar=tk.Frame(self.user_tab); bar.pack(fill="x",padx=15,pady=12); tk.Button(bar,text="+ Add User",command=self.add_user,bg="#0b4f8a",fg="white",bd=0,padx=15,pady=8).pack(side="left"); tk.Button(bar,text="Refresh",command=self.refresh_users,padx=15,pady=7).pack(side="left",padx=8); self.user_tree=self.tree(self.user_tab,("username","role","name")); self.refresh_users()
+        bar=tk.Frame(self.user_tab); bar.pack(fill="x",padx=15,pady=12)
+        tk.Button(bar,text="+ Add User",command=self.add_user,bg="#0b4f8a",fg="white",bd=0,padx=15,pady=8).pack(side="left")
+        tk.Button(bar,text="Refresh Users",command=self.refresh_users,bg="#376a92",fg="white",bd=0,padx=15,pady=8).pack(side="left",padx=8)
+        tk.Button(bar,text="Reset Selected Password",command=self.reset_selected_password,bg="#657789",fg="white",bd=0,padx=15,pady=8).pack(side="left",padx=8)
+        tk.Button(bar,text="Toggle Account Status",command=self.toggle_user_status,bg="#8a5a0b",fg="white",bd=0,padx=15,pady=8).pack(side="left",padx=8)
+        self.user_search=tk.StringVar(); tk.Entry(bar,textvariable=self.user_search,width=22).pack(side="right",padx=5)
+        tk.Button(bar,text="Search",command=self.refresh_users,bg="#0b4f8a",fg="white",bd=0,padx=10,pady=6).pack(side="right")
+        self.user_tree=self.tree(self.user_tab,USER_HEADERS); self.refresh_users()
     def refresh_users(self):
-        for x in self.user_tree.get_children():self.user_tree.delete(x)
-        for u in read_csv("users.csv",USER_HEADERS):self.user_tree.insert("","end",values=(u["username"],u["role"],u["name"]))
+        if not hasattr(self,"user_tree"): return
+        for x in self.user_tree.get_children(): self.user_tree.delete(x)
+        q=self.user_search.get().strip().lower()
+        for row in read_csv("users.csv",USER_HEADERS):
+            if q and q not in " ".join(row.get(k,"") for k in USER_HEADERS).lower(): continue
+            self.user_tree.insert("","end",values=tuple(row.get(k,"") for k in USER_HEADERS))
+    def selected_username(self):
+        sel=self.user_tree.selection()
+        if not sel: messagebox.showwarning("Select User","Select a user first."); return None
+        return self.user_tree.item(sel[0],"values")[0]
+    def reset_selected_password(self):
+        username=self.selected_username()
+        if not username: return
+        if username==self.user.username: messagebox.showwarning("Not Allowed","Use Change Password for your own account."); return
+        win=tk.Toplevel(self); win.title("Reset User Password"); win.geometry("380x230"); win.configure(bg="white")
+        tk.Label(win,text=f"New password for {username}",bg="white",fg="#345").pack(pady=(25,5))
+        e=tk.Entry(win,show="*",font=("Segoe UI",11)); e.pack(fill="x",padx=30,ipady=7)
+        def save():
+            p=e.get()
+            if not self.password_valid(p): messagebox.showwarning("Weak Password","Use at least 8 characters with uppercase, lowercase and a number.",parent=win); return
+            rows=read_csv("users.csv",USER_HEADERS)
+            for r in rows:
+                if r.get("username")==username: r["password"]=p
+            rewrite_csv("users.csv",USER_HEADERS,rows); self.audit("PASSWORD_RESET",username); win.destroy(); self.refresh_users()
+        tk.Button(win,text="Reset Password",command=save,bg="#0b4f8a",fg="white",bd=0,padx=20,pady=8).pack(pady=20)
+    def toggle_user_status(self):
+        username=self.selected_username()
+        if not username: return
+        if username==self.user.username: messagebox.showwarning("Not Allowed","You cannot deactivate your own account."); return
+        rows=read_csv("users.csv",USER_HEADERS); new="Active"
+        for r in rows:
+            if r.get("username")==username: new="Inactive" if r.get("status","Active")=="Active" else "Active"; r["status"]=new
+        rewrite_csv("users.csv",USER_HEADERS,rows); self.audit("USER_STATUS_CHANGED",f"{username} -> {new}"); self.refresh_users()
     def add_user(self):
         win=tk.Toplevel(self); win.title("Add Campus User"); win.geometry("430x390"); win.configure(bg="white"); fields={}
         for label,key in (("Username","username"),("Password","password"),("Display Name","name")):
@@ -268,7 +306,7 @@ class SmartCampusApp(tk.Tk):
             rows=read_csv("users.csv",USER_HEADERS); vals={k:e.get().strip() for k,e in fields.items()}
             if not all(vals.values()):messagebox.showwarning("Required","Complete all fields.",parent=win); return
             if any(x["username"].lower()==vals["username"].lower() for x in rows):messagebox.showerror("Duplicate","Username already exists.",parent=win); return
-            vals["role"]=role.get(); append_csv("users.csv",USER_HEADERS,vals); self.audit("USER_CREATED",vals["username"]); win.destroy(); self.refresh_users(); self.refresh_audit()
+            vals["role"]=role.get(); vals["status"]="Active"; vals["last_login"]=""; append_csv("users.csv",USER_HEADERS,vals); self.audit("USER_CREATED",vals["username"]); win.destroy(); self.refresh_users(); self.refresh_audit()
         tk.Button(win,text="Create User",command=save,bg="#0b4f8a",fg="white",bd=0,padx=20,pady=9).pack(pady=25)
     def draw_bar_chart(self,canvas,title,labels,values):
         canvas.delete("all")
