@@ -81,13 +81,13 @@ class SmartCampusApp(tk.Tk):
     def show_dashboard(self):
         self.clear(); top=tk.Frame(self,bg="#0b4f8a",height=76); top.pack(fill="x"); tk.Label(top,text="Smart Campus Utility Management",font=("Segoe UI",20,"bold"),fg="white",bg="#0b4f8a").pack(side="left",padx=25,pady=18); tk.Label(top,text=f"{self.user.name}  •  {self.user.role}",font=("Segoe UI",10),fg="white",bg="#0b4f8a").pack(side="right",padx=15); tk.Button(top,text="Logout",command=self.show_login,bg="#083b68",fg="white",bd=0,padx=15,pady=8).pack(side="right")
         body=tk.Frame(self,bg="#eef4fb"); body.pack(fill="both",expand=True,padx=20,pady=20); self.build_cards(body); notebook=ttk.Notebook(body); notebook.pack(fill="both",expand=True,pady=(18,0))
-        self.resource_tab=ttk.Frame(notebook); self.complaint_tab=ttk.Frame(notebook); self.usage_tab=ttk.Frame(notebook); self.report_tab=ttk.Frame(notebook); self.analytics_tab=ttk.Frame(notebook); self.alert_tab=ttk.Frame(notebook); self.audit_tab=ttk.Frame(notebook)
-        for tab,text in ((self.resource_tab,"Resources"),(self.complaint_tab,"Complaints"),(self.usage_tab,"Usage"),(self.report_tab,"Reports"),(self.analytics_tab,"Analytics"),(self.alert_tab,"Alerts"),(self.audit_tab,"Audit")):notebook.add(tab,text=f"  {text}  ")
+        self.home_tab=ttk.Frame(notebook); self.resource_tab=ttk.Frame(notebook); self.complaint_tab=ttk.Frame(notebook); self.usage_tab=ttk.Frame(notebook); self.report_tab=ttk.Frame(notebook); self.analytics_tab=ttk.Frame(notebook); self.alert_tab=ttk.Frame(notebook); self.audit_tab=ttk.Frame(notebook)
+        for tab,text in ((self.home_tab,"Dashboard"),(self.resource_tab,"Resources"),(self.complaint_tab,"Complaints"),(self.usage_tab,"Usage"),(self.report_tab,"Reports"),(self.analytics_tab,"Analytics"),(self.alert_tab,"Alerts"),(self.audit_tab,"Audit")):notebook.add(tab,text=f"  {text}  ")
         if self.user.role=="Admin":
             self.user_tab=ttk.Frame(notebook); notebook.add(self.user_tab,text="  Users  ")
             self.admin_tab=ttk.Frame(notebook); notebook.add(self.admin_tab,text="  Admin Center  ")
             self.build_backup_controls(); self.build_admin_center()
-        self.build_resources(); self.build_complaints(); self.build_usage(); self.build_reports(); self.build_analytics(); self.build_alerts(); self.build_audit()
+        self.build_professional_dashboard(self.home_tab); self.build_resources(); self.build_complaints(); self.build_usage(); self.build_reports(); self.build_analytics(); self.build_alerts(); self.build_audit()
         if self.user.role=="Admin":self.build_users()
     def build_professional_dashboard(self,parent):
         frame=tk.Frame(parent,bg="#eef4fb"); frame.pack(fill="both",expand=True)
