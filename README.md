@@ -1,6 +1,15 @@
-# Smart Campus Utility Management System - Version 6
+# Smart Campus Utility Management System - Version 7
 
-Version 4 extends the Python/Tkinter application into a more complete campus resource operations system.
+A Python/Tkinter-based campus utility management system for tracking resources, maintenance, complaints, usage, users, reports, analytics, and operational alerts.
+
+## Version 7 features
+- Alerts dashboard
+- Overdue maintenance alerts
+- Upcoming maintenance alerts for the next 7 days
+- Invalid maintenance date detection
+- Out-of-service resource alerts
+- High and Critical unresolved complaint alerts
+- Refreshable alert view
 
 ## Version 6 features
 - Resource maintenance scheduling
