@@ -10,7 +10,7 @@ from storage import read_csv, append_csv, rewrite_csv
 RESOURCE_HEADERS=["resource_id","name","category","location","status","last_maintenance","next_maintenance"]
 COMPLAINT_HEADERS=["complaint_id","resource_id","title","description","category","priority","reported_by","status","assigned_to"]
 USAGE_HEADERS=["usage_id","resource_id","used_by","purpose","date","duration"]
-USER_HEADERS=["username","password","role","name"]
+USER_HEADERS=["username","password","role","name","status","last_login"]
 CATEGORIES=("Electrical","Computer/IT","Projector","Furniture","Laboratory Equipment","Other")
 PRIORITIES=("Low","Medium","High","Critical")
 STATUSES=("Pending","Assigned","In Progress","Resolved","Closed")
@@ -118,10 +118,10 @@ class SmartCampusApp(tk.Tk):
     def login(self):
         if self.login_attempts>=5:
             messagebox.showerror("Login Locked","Too many failed attempts. Restart the application to try again."); return
-        users=read_csv("users.csv",USER_HEADERS); u=self.login_user.get().strip(); p=self.login_pass.get(); row=next((x for x in users if x["username"]==u and x["password"]==p),None)
+        users=read_csv("users.csv",USER_HEADERS); u=self.login_user.get().strip(); p=self.login_pass.get(); row=next((x for x in users if x["username"]==u and x["password"]==p and x.get("status","Active")=="Active"),None)
         if not row:
             self.login_attempts+=1; messagebox.showerror("Login Failed",f"Invalid username or password. Attempts remaining: {max(0,5-self.login_attempts)}"); return
-        self.login_attempts=0; self.user=User(u,p,row["role"],row["name"]); self.session_started=datetime.now(); self.show_dashboard(); self.audit("LOGIN","Successful login")
+        self.login_attempts=0; self.user=User(u,p,row["role"],row["name"]); self.session_started=datetime.now(); rows=read_csv("users.csv",USER_HEADERS); [r.update({"last_login":datetime.now().strftime("%Y-%m-%d %H:%M:%S")}) for r in rows if r.get("username")==u]; rewrite_csv("users.csv",USER_HEADERS,rows); self.show_dashboard(); self.audit("LOGIN","Successful login")
     def confirm_logout(self):
         if messagebox.askyesno("Confirm Logout","Are you sure you want to logout?"):
             self.audit("LOGOUT","User logged out")
