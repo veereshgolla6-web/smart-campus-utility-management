@@ -80,9 +80,9 @@ class SmartCampusApp(tk.Tk):
         body=tk.Frame(self,bg="#eef4fb"); body.pack(fill="both",expand=True,padx=20,pady=20)
         self.build_cards(body)
         notebook=ttk.Notebook(body); notebook.pack(fill="both",expand=True,pady=(18,0))
-        self.resource_tab=ttk.Frame(notebook); self.complaint_tab=ttk.Frame(notebook); self.usage_tab=ttk.Frame(notebook)
-        notebook.add(self.resource_tab,text="  Resources  "); notebook.add(self.complaint_tab,text="  Complaints  "); notebook.add(self.usage_tab,text="  Usage  ")
-        self.build_resources(); self.build_complaints(); self.build_usage()
+        self.resource_tab=ttk.Frame(notebook); self.complaint_tab=ttk.Frame(notebook); self.usage_tab=ttk.Frame(notebook); self.report_tab=ttk.Frame(notebook)
+        notebook.add(self.resource_tab,text="  Resources  "); notebook.add(self.complaint_tab,text="  Complaints  "); notebook.add(self.usage_tab,text="  Usage  "); notebook.add(self.report_tab,text="  Reports  ")
+        self.build_resources(); self.build_complaints(); self.build_usage(); self.build_reports()
 
     def build_cards(self,parent):
         self.card_vars={}
@@ -113,14 +113,31 @@ class SmartCampusApp(tk.Tk):
         bar=tk.Frame(self.resource_tab); bar.pack(fill="x",padx=15,pady=12)
         tk.Button(bar,text="+ Add Resource",command=self.add_resource,bg="#0b4f8a",fg="white",bd=0,padx=15,pady=8).pack(side="left")
         tk.Button(bar,text="Refresh",command=self.refresh_resources,padx=15,pady=7).pack(side="left",padx=8)
+        tk.Button(bar,text="Update Status",command=self.update_resource_status,bg="#376a92",fg="white",bd=0,padx=12,pady=7).pack(side="left",padx=5)
+        tk.Label(bar,text="Search:",font=("Segoe UI",10,"bold")).pack(side="left",padx=(12,4))
+        self.resource_search=tk.StringVar(); tk.Entry(bar,textvariable=self.resource_search,width=22).pack(side="left",ipady=5); self.resource_search.trace_add("write",lambda *a:self.refresh_resources())
         self.resource_tree=self.tree(self.resource_tab,("resource_id","name","category","location","status"))
         self.refresh_resources()
 
     def refresh_resources(self):
         if not hasattr(self,"resource_tree"): return
         for x in self.resource_tree.get_children(): self.resource_tree.delete(x)
-        for r in read_csv("resources.csv",RESOURCE_HEADERS): self.resource_tree.insert("", "end", values=tuple(r[c] for c in RESOURCE_HEADERS))
+        term=getattr(self,"resource_search",tk.StringVar()).get().lower().strip()
+        for r in read_csv("resources.csv",RESOURCE_HEADERS):
+            if not term or term in " ".join(r.values()).lower(): self.resource_tree.insert("", "end", values=tuple(r[c] for c in RESOURCE_HEADERS))
         self.refresh_cards()
+
+    def update_resource_status(self):
+        item=self.resource_tree.selection()
+        if not item: messagebox.showwarning("Select Resource","Select a resource first."); return
+        rid=self.resource_tree.item(item[0],"values")[0]; rows=read_csv("resources.csv",RESOURCE_HEADERS)
+        win=tk.Toplevel(self); win.title("Update Resource Status"); win.geometry("360x220")
+        status=tk.StringVar(value="Available"); ttk.Combobox(win,textvariable=status,values=("Available","In Use","Maintenance","Out of Service"),state="readonly").pack(fill="x",padx=35,pady=35)
+        def save():
+            for r in rows:
+                if r["resource_id"]==rid: r["status"]=status.get()
+            rewrite_csv("resources.csv",RESOURCE_HEADERS,rows); win.destroy(); self.refresh_resources()
+        tk.Button(win,text="Save Status",command=save,bg="#0b4f8a",fg="white",bd=0,padx=20,pady=8).pack()
 
     def add_resource(self):
         win=tk.Toplevel(self); win.title("Add Resource"); win.geometry("430x390"); win.configure(bg="white")
@@ -142,15 +159,32 @@ class SmartCampusApp(tk.Tk):
         bar=tk.Frame(self.complaint_tab); bar.pack(fill="x",padx=15,pady=12)
         tk.Button(bar,text="+ New Complaint",command=self.add_complaint,bg="#0b4f8a",fg="white",bd=0,padx=15,pady=8).pack(side="left")
         tk.Button(bar,text="Refresh",command=self.refresh_complaints,padx=15,pady=7).pack(side="left",padx=8)
+        tk.Button(bar,text="Update Selected",command=self.update_complaint,bg="#376a92",fg="white",bd=0,padx=12,pady=7).pack(side="left",padx=5)
+        tk.Label(bar,text="Search:",font=("Segoe UI",10,"bold")).pack(side="left",padx=(12,4))
+        self.complaint_search=tk.StringVar(); tk.Entry(bar,textvariable=self.complaint_search,width=22).pack(side="left",ipady=5); self.complaint_search.trace_add("write",lambda *a:self.refresh_complaints())
         self.complaint_tree=self.tree(self.complaint_tab,("complaint_id","resource_id","title","category","priority","status","reported_by"))
         self.refresh_complaints()
 
     def refresh_complaints(self):
         if not hasattr(self,"complaint_tree"): return
         for x in self.complaint_tree.get_children(): self.complaint_tree.delete(x)
+        term=getattr(self,"complaint_search",tk.StringVar()).get().lower().strip()
         for c in read_csv("complaints.csv",COMPLAINT_HEADERS):
-            self.complaint_tree.insert("", "end", values=tuple(c[k] for k in ("complaint_id","resource_id","title","category","priority","status","reported_by")))
+            if not term or term in " ".join(c.values()).lower(): self.complaint_tree.insert("", "end", values=tuple(c[k] for k in ("complaint_id","resource_id","title","category","priority","status","reported_by")))
         self.refresh_cards()
+
+    def update_complaint(self):
+        item=self.complaint_tree.selection()
+        if not item: messagebox.showwarning("Select Complaint","Select a complaint first."); return
+        cid=self.complaint_tree.item(item[0],"values")[0]; rows=read_csv("complaints.csv",COMPLAINT_HEADERS); current=next((r for r in rows if r["complaint_id"]==cid),None)
+        if not current:return
+        win=tk.Toplevel(self); win.title("Update Complaint"); win.geometry("430x300")
+        tk.Label(win,text=f"{cid} - {current['title']}",font=("Segoe UI",11,"bold")).pack(pady=18)
+        status=tk.StringVar(value=current["status"]); ttk.Combobox(win,textvariable=status,values=STATUSES,state="readonly").pack(fill="x",padx=30,pady=8)
+        tk.Label(win,text="Assigned To").pack(anchor="w",padx=30); assigned=tk.Entry(win); assigned.insert(0,current["assigned_to"]); assigned.pack(fill="x",padx=30,ipady=6)
+        def save():
+            current["status"]=status.get(); current["assigned_to"]=assigned.get().strip(); rewrite_csv("complaints.csv",COMPLAINT_HEADERS,rows); win.destroy(); self.refresh_complaints()
+        tk.Button(win,text="Save Changes",command=save,bg="#0b4f8a",fg="white",bd=0,padx=20,pady=8).pack(pady=20)
 
     def add_complaint(self):
         resources=read_csv("resources.csv",RESOURCE_HEADERS)
@@ -191,6 +225,31 @@ class SmartCampusApp(tk.Tk):
         for x in self.usage_tree.get_children(): self.usage_tree.delete(x)
         for u in read_csv("usage.csv",USAGE_HEADERS): self.usage_tree.insert("", "end", values=tuple(u[k] for k in USAGE_HEADERS))
         self.refresh_cards()
+
+    def build_reports(self):
+        bar=tk.Frame(self.report_tab); bar.pack(fill="x",padx=15,pady=12)
+        tk.Button(bar,text="Refresh Summary",command=self.refresh_report_summary,bg="#0b4f8a",fg="white",bd=0,padx=15,pady=8).pack(side="left")
+        tk.Button(bar,text="Export CSV Reports",command=self.export_reports,padx=15,pady=7).pack(side="left",padx=8)
+        self.report_text=tk.Text(self.report_tab,font=("Consolas",11),bg="white",fg="#12395b",bd=0,padx=20,pady=20); self.report_text.pack(fill="both",expand=True,padx=15,pady=10); self.refresh_report_summary()
+
+    def refresh_report_summary(self):
+        resources=read_csv("resources.csv",RESOURCE_HEADERS); complaints=read_csv("complaints.csv",COMPLAINT_HEADERS); usage=read_csv("usage.csv",USAGE_HEADERS)
+        lines=["SMART CAMPUS UTILITY MANAGEMENT REPORT","="*58,f"Generated: {datetime.now():%Y-%m-%d %H:%M:%S}","",f"Total Resources: {len(resources)}"]
+        for st in ("Available","In Use","Maintenance","Out of Service"):lines.append(f"{st}: {sum(r['status']==st for r in resources)}")
+        lines += ["",f"Total Complaints: {len(complaints)}"]
+        for st in STATUSES:lines.append(f"{st}: {sum(c['status']==st for c in complaints)}")
+        for p in PRIORITIES:lines.append(f"{p} priority: {sum(c['priority']==p for c in complaints)}")
+        lines += ["",f"Usage Records: {len(usage)}"]
+        self.report_text.delete("1.0","end"); self.report_text.insert("1.0","\n".join(lines))
+
+    def export_reports(self):
+        import csv
+        out=__import__("pathlib").Path("reports"); out.mkdir(exist_ok=True)
+        for target,source,headers in [("resource_report.csv","resources.csv",RESOURCE_HEADERS),("complaint_report.csv","complaints.csv",COMPLAINT_HEADERS),("usage_report.csv","usage.csv",USAGE_HEADERS)]:
+            rows=read_csv(source,headers)
+            with (out/target).open("w",newline="",encoding="utf-8") as f:
+                w=csv.DictWriter(f,fieldnames=headers); w.writeheader(); w.writerows(rows)
+        messagebox.showinfo("Export Complete","Three CSV reports were saved in the reports folder.")
 
     def add_usage(self):
         resources=read_csv("resources.csv",RESOURCE_HEADERS)
