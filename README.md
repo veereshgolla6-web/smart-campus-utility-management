@@ -2,6 +2,16 @@
 
 A Python/Tkinter campus utility management system for resources, maintenance, complaints, usage, reports, analytics, alerts, backups, audit history, administration, and dashboard monitoring.
 
+## Version 18 — Advanced User & Role Management
+- User search and filtering
+- Active/Inactive account status
+- Admin password reset for selected users
+- Last-login tracking
+- Inactive accounts cannot log in
+- Admin-only user controls
+- User status and password actions recorded in the audit trail
+- Existing role-based access controls retained
+
 ## Version 17 — System Notifications & Notification Center
 - Dedicated Notifications tab
 - Automatic out-of-service resource notifications
