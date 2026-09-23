@@ -29,7 +29,7 @@ class SmartCampusApp(tk.Tk):
         self.style=ttk.Style(self)
         try:self.style.theme_use("clam")
         except tk.TclError:pass
-        self.style.configure("Treeview",rowheight=30,font=("Segoe UI",10)); self.style.configure("Treeview.Heading",font=("Segoe UI",10,"bold")); self.style.configure("TNotebook.Tab",padding=(18,10),font=("Segoe UI",10,"bold")); self.show_login()
+        self.style.configure("Treeview",rowheight=30,font=("Segoe UI",10)); self.style.configure("Treeview.Heading",font=("Segoe UI",10,"bold")); self.style.configure("TNotebook",background="#eef4fb",borderwidth=0); self.style.configure("TNotebook.Tab",padding=(10,8),font=("Segoe UI",9,"bold"),foreground="#12395b",background="#ffffff"); self.style.map("TNotebook.Tab",foreground=[("selected","#ffffff")],background=[("selected","#0b4f8a"),("active","#d9ecff")]); self.show_login()
     def notify(self,kind,title,message):
         append_csv("notifications.csv",NOTIFICATION_HEADERS,{"timestamp":datetime.now().strftime("%Y-%m-%d %H:%M:%S"),"username":self.user.username if self.user else "SYSTEM","type":kind,"title":title,"message":message,"read":"No"})
     def refresh_notifications(self):
