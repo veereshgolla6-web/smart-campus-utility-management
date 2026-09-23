@@ -1348,6 +1348,7 @@ class SmartCampusApp(tk.Tk):
         tk.Button(bar,text="Run JARVIS Scan",command=self.run_automation_scan,bg="#0b4f8a",fg="white",bd=0,padx=14,pady=8).pack(side="left")
         tk.Button(bar,text="Refresh",command=self.refresh_automation_center,bg="#376a92",fg="white",bd=0,padx=14,pady=8).pack(side="left",padx=6)
         tk.Button(bar,text="Generate Daily Summary",command=self.generate_daily_summary,bg="#657789",fg="white",bd=0,padx=14,pady=8).pack(side="left",padx=6)
+        tk.Button(bar,text="Platform Health",command=self.show_platform_health,bg="#657789",fg="white",bd=0,padx=14,pady=8).pack(side="left",padx=6)
         self.automation_text=tk.Text(self.automation_tab,font=("Consolas",10),bg="white",fg="#12395b",bd=0,padx=20,pady=15)
         self.automation_text.pack(fill="both",expand=True,padx=15,pady=10)
         self.refresh_automation_center()
@@ -1436,6 +1437,11 @@ class SmartCampusApp(tk.Tk):
     def final_release_check(self):
         return {"versions_completed":"1-40","production_health":self.production_health_check(),"security":self.security_status_summary(),"analytics":self.analytics_snapshot()}
 
+    def show_platform_health(self):
+        snap=self.final_release_check()
+        win=tk.Toplevel(self); win.title("JARVIS Platform Health & Final Release"); win.geometry("820x560")
+        txt=tk.Text(win,font=("Consolas",10),bg="white",fg="#12395b",padx=20,pady=15); txt.pack(fill="both",expand=True,padx=20,pady=20)
+        txt.insert("1.0","JARVIS SMART CAMPUS PLATFORM\n"+"="*70+"\n\nVERSIONS 1-40 DEVELOPMENT STATUS\n\n"+"Production data files: "+str(snap["production_health"]["healthy"])+"/"+str(snap["production_health"]["total"])+"\n"+"Active users: "+str(snap["security"]["active"])+"\n"+"Resources: "+str(snap["analytics"]["resources"])+"\n"+"Available resources: "+str(snap["analytics"]["available"])+"\n"+"Open complaints: "+str(snap["analytics"]["open_complaints"])+"\n"+"Average health: "+str(round(snap["analytics"]["avg_health"],1))+"\n"+"Average utilization: "+str(round(snap["analytics"]["avg_utilization"],1))+"%\n\nV31 Workflow & Approvals\nV32 Advanced Analytics\nV33 Campus Resource Intelligence\nV34 Intelligent Scheduling\nV35 Mobile Operations\nV36 Security & Compliance\nV37 Automated Management Reports\nV38 Integration/API Ready\nV39 Production Health & Reliability\nV40 FINAL JARVIS PLATFORM\n\nCore functionality is integrated into the application and ready for further deployment hardening.")
     def build_complaints(self):
         bar=tk.Frame(self.complaint_tab);bar.pack(fill="x",padx=15,pady=12);tk.Button(bar,text="+ New Complaint",command=self.add_complaint,bg="#0b4f8a",fg="white",bd=0,padx=15,pady=8).pack(side="left");tk.Button(bar,text="Refresh",command=self.refresh_complaints,padx=15,pady=7).pack(side="left",padx=8)
         if self.user.role in ("Admin","Faculty"):tk.Button(bar,text="Update Selected",command=self.update_complaint,bg="#376a92",fg="white",bd=0,padx=12,pady=7).pack(side="left",padx=5)
