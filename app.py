@@ -163,13 +163,13 @@ class SmartCampusApp(tk.Tk):
     def show_dashboard(self):
         self.clear(); top=tk.Frame(self,bg="#0b4f8a",height=76); top.pack(fill="x"); tk.Label(top,text="Smart Campus Utility Management",font=("Segoe UI",20,"bold"),fg="white",bg="#0b4f8a").pack(side="left",padx=25,pady=18); tk.Label(top,text=f"{self.user.name}  •  {self.user.role}  •  Login: {self.session_started.strftime("%H:%M") if self.session_started else ""}",font=("Segoe UI",10),fg="white",bg="#0b4f8a").pack(side="right",padx=15); tk.Button(top,text="Logout",command=self.confirm_logout,bg="#083b68",fg="white",bd=0,padx=15,pady=8).pack(side="right"); tk.Button(top,text="My Profile",command=self.user_profile,bg="#376a92",fg="white",bd=0,padx=15,pady=8).pack(side="right",padx=5)
         body=tk.Frame(self,bg="#eef4fb"); body.pack(fill="both",expand=True,padx=20,pady=20); self.build_cards(body); notebook=ttk.Notebook(body); notebook.pack(fill="both",expand=True,pady=(18,0))
-        self.home_tab=ttk.Frame(notebook); self.notification_tab=ttk.Frame(notebook); self.resource_tab=ttk.Frame(notebook); self.reservation_tab=ttk.Frame(notebook); self.complaint_tab=ttk.Frame(notebook); self.usage_tab=ttk.Frame(notebook); self.report_tab=ttk.Frame(notebook); self.analytics_tab=ttk.Frame(notebook); self.alert_tab=ttk.Frame(notebook); self.audit_tab=ttk.Frame(notebook)
-        for tab,text in ((self.home_tab,"Dashboard"),(self.notification_tab,"Notifications"),(self.resource_tab,"Resources"),(self.reservation_tab,"Reservations"),(self.complaint_tab,"Complaints"),(self.usage_tab,"Usage"),(self.report_tab,"Reports"),(self.analytics_tab,"Analytics"),(self.alert_tab,"Alerts"),(self.audit_tab,"Audit")):notebook.add(tab,text=f"  {text}  ")
+        self.home_tab=ttk.Frame(notebook); self.notification_tab=ttk.Frame(notebook); self.resource_tab=ttk.Frame(notebook); self.reservation_tab=ttk.Frame(notebook); self.schedule_tab=ttk.Frame(notebook); self.complaint_tab=ttk.Frame(notebook); self.usage_tab=ttk.Frame(notebook); self.report_tab=ttk.Frame(notebook); self.analytics_tab=ttk.Frame(notebook); self.alert_tab=ttk.Frame(notebook); self.audit_tab=ttk.Frame(notebook)
+        for tab,text in ((self.home_tab,"Dashboard"),(self.notification_tab,"Notifications"),(self.resource_tab,"Resources"),(self.reservation_tab,"Reservations"),(self.schedule_tab,"Smart Scheduling"),(self.complaint_tab,"Complaints"),(self.usage_tab,"Usage"),(self.report_tab,"Reports"),(self.analytics_tab,"Analytics"),(self.alert_tab,"Alerts"),(self.audit_tab,"Audit")):notebook.add(tab,text=f"  {text}  ")
         if self.user.role=="Admin":
             self.user_tab=ttk.Frame(notebook); notebook.add(self.user_tab,text="  Users  ")
             self.admin_tab=ttk.Frame(notebook); notebook.add(self.admin_tab,text="  Admin Center  ")
             self.build_backup_controls(); self.build_admin_center()
-        self.build_professional_dashboard(self.home_tab); self.build_notifications(self.notification_tab); self.build_resources(); self.build_reservations(); self.build_complaints(); self.build_usage(); self.build_reports(); self.build_analytics(); self.build_alerts(); self.build_audit()
+        self.build_professional_dashboard(self.home_tab); self.build_notifications(self.notification_tab); self.build_resources(); self.build_reservations(); self.build_smart_scheduling(); self.build_complaints(); self.build_usage(); self.build_reports(); self.build_analytics(); self.build_alerts(); self.build_audit()
         if self.user.role=="Admin":self.build_users()
     def build_professional_dashboard(self,parent):
         frame=tk.Frame(parent,bg="#eef4fb"); frame.pack(fill="both",expand=True)
@@ -598,6 +598,110 @@ class SmartCampusApp(tk.Tk):
         tk.Button(top,text="Show Schedule",command=load,bg="#0b4f8a",fg="white",bd=0,padx=15,pady=7).pack(side="left",padx=8)
         if resources:
             rm.set(f"{resources[0].get('resource_id')} - {resources[0].get('name')}"); load()
+
+    def reservation_hours(self,row):
+        try:
+            start=datetime.strptime(row.get("start_time",""),"%H:%M")
+            end=datetime.strptime(row.get("end_time",""),"%H:%M")
+            return max(0.0,(end-start).total_seconds()/3600.0)
+        except ValueError:
+            return 0.0
+
+    def schedule_period(self):
+        if not hasattr(self,"schedule_period_var"): return datetime.now().date(),datetime.now().date()
+        choice=self.schedule_period_var.get()
+        today=datetime.now().date()
+        if choice=="Today": return today,today
+        return today,today.replace() if False else today+__import__("datetime").timedelta(days=6)
+
+    def calculate_utilization(self,start_date,end_date):
+        resources=read_csv("resources.csv",RESOURCE_HEADERS)
+        reservations=read_csv("reservations.csv",RESERVATION_HEADERS)
+        days=max(1,(end_date-start_date).days+1)
+        capacity_hours=days*OPERATING_HOURS_PER_DAY
+        stats={}
+        for r in resources:
+            rid=r.get("resource_id","")
+            stats[rid]={"resource_id":rid,"name":r.get("name",""),"department":r.get("department",""),"capacity_hours":capacity_hours,"reserved_hours":0.0,"utilization":0.0}
+        for row in reservations:
+            if row.get("status") in ("Cancelled","Completed"): continue
+            try: d=datetime.strptime(row.get("date",""),"%Y-%m-%d").date()
+            except ValueError: continue
+            if start_date<=d<=end_date and row.get("resource_id") in stats:
+                stats[row["resource_id"]]["reserved_hours"]+=self.reservation_hours(row)
+        for x in stats.values():
+            x["utilization"]=(x["reserved_hours"]/x["capacity_hours"]*100) if x["capacity_hours"] else 0.0
+        return list(stats.values())
+
+    def build_smart_scheduling(self):
+        bar=tk.Frame(self.schedule_tab,bg="#eef4fb"); bar.pack(fill="x",padx=15,pady=12)
+        self.schedule_period_var=tk.StringVar(value="Next 7 Days")
+        tk.Label(bar,text="Period:",bg="#eef4fb",fg="#456",font=("Segoe UI",10,"bold")).pack(side="left")
+        ttk.Combobox(bar,textvariable=self.schedule_period_var,values=("Today","Next 7 Days"),state="readonly",width=14).pack(side="left",padx=6)
+        tk.Button(bar,text="Refresh Utilization",command=self.refresh_smart_scheduling,bg="#0b4f8a",fg="white",bd=0,padx=14,pady=8).pack(side="left",padx=5)
+        tk.Button(bar,text="Find Available Slot",command=self.find_available_slot,bg="#376a92",fg="white",bd=0,padx=14,pady=8).pack(side="left",padx=5)
+        tk.Button(bar,text="Conflict Check",command=self.show_schedule_conflicts,bg="#8a5a0b",fg="white",bd=0,padx=14,pady=8).pack(side="left",padx=5)
+        self.schedule_kpi=tk.StringVar(value="")
+        tk.Label(bar,textvariable=self.schedule_kpi,bg="#eef4fb",fg="#12395b",font=("Segoe UI",10,"bold")).pack(side="right",padx=8)
+        self.util_tree=self.tree(self.schedule_tab,("resource_id","name","department","capacity_hours","reserved_hours","utilization_percent"))
+        self.refresh_smart_scheduling()
+
+    def refresh_smart_scheduling(self):
+        if not hasattr(self,"util_tree"): return
+        start,end=self.schedule_period()
+        stats=self.calculate_utilization(start,end)
+        for x in self.util_tree.get_children(): self.util_tree.delete(x)
+        for x in sorted(stats,key=lambda z:z["utilization"],reverse=True):
+            self.util_tree.insert("","end",values=(x["resource_id"],x["name"],x["department"],f"{x['capacity_hours']:.1f}",f"{x['reserved_hours']:.1f}",f"{x['utilization']:.1f}%"))
+        total=len(stats); avg=(sum(x["utilization"] for x in stats)/total) if total else 0
+        busiest=max(stats,key=lambda z:z["utilization"])["name"] if stats else "None"
+        least=min(stats,key=lambda z:z["utilization"])["name"] if stats else "None"
+        self.schedule_kpi.set(f"Resources: {total}  |  Average utilization: {avg:.1f}%  |  Most used: {busiest}  |  Least used: {least}")
+
+    def show_schedule_conflicts(self):
+        rows=read_csv("reservations.csv",RESERVATION_HEADERS); conflicts=[]
+        for i,a in enumerate(rows):
+            if a.get("status") in ("Cancelled","Completed"): continue
+            for b in rows[i+1:]:
+                if b.get("status") in ("Cancelled","Completed") or a.get("resource_id")!=b.get("resource_id") or a.get("date")!=b.get("date"): continue
+                pa=self.valid_reservation_times(a.get("date",""),a.get("start_time",""),a.get("end_time","")); pb=self.valid_reservation_times(b.get("date",""),b.get("start_time",""),b.get("end_time",""))
+                if pa and pb and self.reservation_overlap(pa[1],pa[2],pb[1],pb[2]):
+                    conflicts.append((a,b))
+        win=tk.Toplevel(self); win.title("Scheduling Conflicts"); win.geometry("900x420"); win.configure(bg="white")
+        tk.Label(win,text="SCHEDULING CONFLICTS",font=("Segoe UI",16,"bold"),fg="#12395b",bg="white").pack(pady=15)
+        tree=self.tree(win,("resource_id","date","reservation_1","time_1","reservation_2","time_2"))
+        for a,b in conflicts:
+            tree.insert("","end",values=(a.get("resource_id",""),a.get("date",""),a.get("reservation_id",""),f"{a.get('start_time')} - {a.get('end_time')}",b.get("reservation_id",""),f"{b.get('start_time')} - {b.get('end_time')}"))
+        if not conflicts: tk.Label(win,text="No overlapping active/pending reservations found.",bg="white",fg="#4b7650",font=("Segoe UI",11,"bold")).pack(pady=20)
+        self.audit("SCHEDULE_CONFLICT_CHECK",f"{len(conflicts)} conflict(s) found")
+
+    def find_available_slot(self):
+        resources=read_csv("resources.csv",RESOURCE_HEADERS)
+        win=tk.Toplevel(self); win.title("Smart Availability Recommendation"); win.geometry("520x500"); win.configure(bg="white")
+        tk.Label(win,text="SMART AVAILABILITY",font=("Segoe UI",18,"bold"),fg="#12395b",bg="white").pack(pady=(22,5))
+        tk.Label(win,text="Choose a date and duration; the system finds the first free resource slot.",bg="white",fg="#60758a").pack(pady=(0,18))
+        date_e=tk.Entry(win,font=("Segoe UI",11)); date_e.insert(0,datetime.now().strftime("%Y-%m-%d")); date_e.pack(fill="x",padx=35,ipady=7)
+        dur_e=tk.Entry(win,font=("Segoe UI",11)); dur_e.insert(0,"1"); dur_e.pack(fill="x",padx=35,ipady=7)
+        result=tk.Text(win,font=("Consolas",10),bg="#f7fbff",fg="#12395b",height=12,bd=0,padx=10,pady=10); result.pack(fill="both",expand=True,padx=35,pady=15)
+        def find():
+            try: date=datetime.strptime(date_e.get().strip(),"%Y-%m-%d").date(); duration=float(dur_e.get().strip())
+            except ValueError: messagebox.showwarning("Invalid Input","Enter date as YYYY-MM-DD and duration as a number of hours.",parent=win); return
+            if duration<=0 or duration>OPERATING_HOURS_PER_DAY: messagebox.showwarning("Invalid Duration",f"Duration must be between 0 and {OPERATING_HOURS_PER_DAY} hours.",parent=win); return
+            results=[]
+            for r in resources:
+                if r.get("status")!="Available": continue
+                rid=r.get("resource_id","")
+                bookings=[x for x in read_csv("reservations.csv",RESERVATION_HEADERS) if x.get("resource_id")==rid and x.get("date")==date.strftime("%Y-%m-%d") and x.get("status") not in ("Cancelled","Completed")]
+                cursor=9*60
+                while cursor+int(duration*60)<=17*60:
+                    st=f"{cursor//60:02d}:{cursor%60:02d}"; enm=cursor+int(duration*60); en=f"{enm//60:02d}:{enm%60:02d}"
+                    if not self.find_reservation_conflicts(rid,date.strftime("%Y-%m-%d"),st,en): results.append((rid,r.get("name",""),r.get("department",""),st,en)); break
+                    cursor+=30
+            result.delete("1.0","end")
+            if results:
+                result.insert("1.0","SMART RECOMMENDATIONS\n\n"+"\n".join(f"{rid} | {name} | {dept or 'Unassigned'} | {st}-{en}" for rid,name,dept,st,en in results))
+            else: result.insert("1.0","No free slot found for the requested date and duration.")
+        tk.Button(win,text="Find Free Slots",command=find,bg="#0b4f8a",fg="white",bd=0,padx=20,pady=9).pack(pady=(0,20))
 
     def build_complaints(self):
         bar=tk.Frame(self.complaint_tab);bar.pack(fill="x",padx=15,pady=12);tk.Button(bar,text="+ New Complaint",command=self.add_complaint,bg="#0b4f8a",fg="white",bd=0,padx=15,pady=8).pack(side="left");tk.Button(bar,text="Refresh",command=self.refresh_complaints,padx=15,pady=7).pack(side="left",padx=8)
