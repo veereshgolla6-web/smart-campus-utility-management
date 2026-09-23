@@ -81,7 +81,7 @@ class SmartCampusApp(tk.Tk):
         self.build_cards(body)
         notebook=ttk.Notebook(body); notebook.pack(fill="both",expand=True,pady=(18,0))
         self.resource_tab=ttk.Frame(notebook); self.complaint_tab=ttk.Frame(notebook); self.usage_tab=ttk.Frame(notebook); self.report_tab=ttk.Frame(notebook); self.analytics_tab=ttk.Frame(notebook)
-        notebook.add(self.resource_tab,text="  Resources  "); notebook.add(self.complaint_tab,text="  Complaints  "); notebook.add(self.usage_tab,text="  Usage  "); notebook.add(self.report_tab,text="  Reports  "); notebook.add(self.analytics_tab,text="  Analytics  ")
+        notebook.add(self.resource_tab,text="  Resources  "); notebook.add(self.complaint_tab,text="  Complaints  "); notebook.add(self.usage_tab,text="  Usage  "); notebook.add(self.report_tab,text="  Reports  "); notebook.add(self.analytics_tab,text="  Analytics  "); self.alert_tab=ttk.Frame(notebook); notebook.add(self.alert_tab,text="  Alerts  ")
         if self.user.role == "Admin":
             self.user_tab=ttk.Frame(notebook); notebook.add(self.user_tab,text="  Users  ")
         self.build_resources(); self.build_complaints(); self.build_usage(); self.build_reports()
@@ -166,6 +166,39 @@ class SmartCampusApp(tk.Tk):
         for rid,count in sorted(counts.items(),key=lambda x:x[1],reverse=True):
             lines.append(f"{rid}: {count} usage record(s)")
         self.analytics_text.delete("1.0","end"); self.analytics_text.insert("1.0","\n".join(lines))
+
+    def build_alerts(self):
+        bar=tk.Frame(self.alert_tab); bar.pack(fill="x",padx=15,pady=12)
+        tk.Button(bar,text="Refresh Alerts",command=self.refresh_alerts,bg="#0b4f8a",fg="white",bd=0,padx=15,pady=8).pack(side="left")
+        self.alert_text=tk.Text(self.alert_tab,font=("Consolas",11),bg="white",fg="#12395b",bd=0,padx=20,pady=20)
+        self.alert_text.pack(fill="both",expand=True,padx=15,pady=10)
+        self.refresh_alerts()
+
+    def refresh_alerts(self):
+        resources=read_csv("resources.csv",RESOURCE_HEADERS)
+        complaints=read_csv("complaints.csv",COMPLAINT_HEADERS)
+        today=datetime.now().date()
+        alerts=[]
+        for r in resources:
+            nxt=r.get("next_maintenance","").strip()
+            if nxt:
+                try:
+                    d=datetime.strptime(nxt,"%Y-%m-%d").date()
+                    days=(d-today).days
+                    if days < 0: alerts.append(f"OVERDUE MAINTENANCE: {r['resource_id']} - {r['name']} ({abs(days)} day(s) overdue)")
+                    elif days <= 7: alerts.append(f"UPCOMING MAINTENANCE: {r['resource_id']} - {r['name']} in {days} day(s)")
+                except ValueError:
+                    alerts.append(f"INVALID MAINTENANCE DATE: {r['resource_id']} - {r['name']}")
+            if r["status"]=="Out of Service":
+                alerts.append(f"RESOURCE UNAVAILABLE: {r['resource_id']} - {r['name']}")
+        for x in complaints:
+            if x["priority"] in ("High","Critical") and x["status"] not in ("Resolved","Closed"):
+                alerts.append(f"{x['priority'].upper()} COMPLAINT: {x['complaint_id']} - {x['title']}")
+        self.alert_text.delete("1.0","end")
+        if alerts:
+            self.alert_text.insert("1.0","SMART CAMPUS ALERTS\n"+"="*60+"\n\n"+"\n".join("• "+a for a in alerts))
+        else:
+            self.alert_text.insert("1.0","SMART CAMPUS ALERTS\n"+"="*60+"\n\nNo active alerts.")
 
     def build_resources(self):
         bar=tk.Frame(self.resource_tab); bar.pack(fill="x",padx=15,pady=12)
