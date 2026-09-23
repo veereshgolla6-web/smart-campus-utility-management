@@ -15,7 +15,7 @@ CATEGORIES=("Electrical","Computer/IT","Projector","Furniture","Laboratory Equip
 PRIORITIES=("Low","Medium","High","Critical")
 STATUSES=("Pending","Assigned","In Progress","Resolved","Closed")
 RESOURCE_STATUSES=("Available","In Use","Maintenance","Out of Service")
-DATA_FILES=("users.csv","resources.csv","complaints.csv","usage.csv","reservations.csv")
+DATA_FILES=("users.csv","resources.csv","complaints.csv","usage.csv","reservations.csv","maintenance.csv")
 AUDIT_HEADERS=("timestamp","username","role","action","details")
 NOTIFICATION_HEADERS=("timestamp","username","type","title","message","read")
 
@@ -163,13 +163,13 @@ class SmartCampusApp(tk.Tk):
     def show_dashboard(self):
         self.clear(); top=tk.Frame(self,bg="#0b4f8a",height=76); top.pack(fill="x"); tk.Label(top,text="Smart Campus Utility Management",font=("Segoe UI",20,"bold"),fg="white",bg="#0b4f8a").pack(side="left",padx=25,pady=18); tk.Label(top,text=f"{self.user.name}  •  {self.user.role}  •  Login: {self.session_started.strftime("%H:%M") if self.session_started else ""}",font=("Segoe UI",10),fg="white",bg="#0b4f8a").pack(side="right",padx=15); tk.Button(top,text="Logout",command=self.confirm_logout,bg="#083b68",fg="white",bd=0,padx=15,pady=8).pack(side="right"); tk.Button(top,text="My Profile",command=self.user_profile,bg="#376a92",fg="white",bd=0,padx=15,pady=8).pack(side="right",padx=5)
         body=tk.Frame(self,bg="#eef4fb"); body.pack(fill="both",expand=True,padx=20,pady=20); self.build_cards(body); notebook=ttk.Notebook(body); notebook.pack(fill="both",expand=True,pady=(18,0))
-        self.home_tab=ttk.Frame(notebook); self.notification_tab=ttk.Frame(notebook); self.resource_tab=ttk.Frame(notebook); self.reservation_tab=ttk.Frame(notebook); self.schedule_tab=ttk.Frame(notebook); self.complaint_tab=ttk.Frame(notebook); self.usage_tab=ttk.Frame(notebook); self.report_tab=ttk.Frame(notebook); self.analytics_tab=ttk.Frame(notebook); self.alert_tab=ttk.Frame(notebook); self.audit_tab=ttk.Frame(notebook)
-        for tab,text in ((self.home_tab,"Dashboard"),(self.notification_tab,"Notifications"),(self.resource_tab,"Resources"),(self.reservation_tab,"Reservations"),(self.schedule_tab,"Smart Scheduling"),(self.complaint_tab,"Complaints"),(self.usage_tab,"Usage"),(self.report_tab,"Reports"),(self.analytics_tab,"Analytics"),(self.alert_tab,"Alerts"),(self.audit_tab,"Audit")):notebook.add(tab,text=f"  {text}  ")
+        self.home_tab=ttk.Frame(notebook); self.notification_tab=ttk.Frame(notebook); self.resource_tab=ttk.Frame(notebook); self.reservation_tab=ttk.Frame(notebook); self.schedule_tab=ttk.Frame(notebook); self.health_tab=ttk.Frame(notebook); self.complaint_tab=ttk.Frame(notebook); self.usage_tab=ttk.Frame(notebook); self.report_tab=ttk.Frame(notebook); self.analytics_tab=ttk.Frame(notebook); self.alert_tab=ttk.Frame(notebook); self.audit_tab=ttk.Frame(notebook)
+        for tab,text in ((self.home_tab,"Dashboard"),(self.notification_tab,"Notifications"),(self.resource_tab,"Resources"),(self.reservation_tab,"Reservations"),(self.schedule_tab,"Smart Scheduling"),(self.health_tab,"Resource Health"),(self.complaint_tab,"Complaints"),(self.usage_tab,"Usage"),(self.report_tab,"Reports"),(self.analytics_tab,"Analytics"),(self.alert_tab,"Alerts"),(self.audit_tab,"Audit")):notebook.add(tab,text=f"  {text}  ")
         if self.user.role=="Admin":
             self.user_tab=ttk.Frame(notebook); notebook.add(self.user_tab,text="  Users  ")
             self.admin_tab=ttk.Frame(notebook); notebook.add(self.admin_tab,text="  Admin Center  ")
             self.build_backup_controls(); self.build_admin_center()
-        self.build_professional_dashboard(self.home_tab); self.build_notifications(self.notification_tab); self.build_resources(); self.build_reservations(); self.build_smart_scheduling(); self.build_complaints(); self.build_usage(); self.build_reports(); self.build_analytics(); self.build_alerts(); self.build_audit()
+        self.build_professional_dashboard(self.home_tab); self.build_notifications(self.notification_tab); self.build_resources(); self.build_reservations(); self.build_smart_scheduling(); self.build_resource_health(); self.build_complaints(); self.build_usage(); self.build_reports(); self.build_analytics(); self.build_alerts(); self.build_audit()
         if self.user.role=="Admin":self.build_users()
     def build_professional_dashboard(self,parent):
         frame=tk.Frame(parent,bg="#eef4fb"); frame.pack(fill="both",expand=True)
@@ -737,6 +737,109 @@ class SmartCampusApp(tk.Tk):
                 result.insert("1.0","SMART RECOMMENDATIONS\n\n"+"\n".join(f"{rid} | {name} | {dept or 'Unassigned'} | {st}-{en}" for rid,name,dept,st,en in results))
             else: result.insert("1.0","No free slot found for the requested date and duration.")
         tk.Button(win,text="Find Free Slots",command=find,bg="#0b4f8a",fg="white",bd=0,padx=20,pady=9).pack(pady=(0,20))
+
+    def maintenance_id(self):
+        rows=read_csv("maintenance.csv",MAINTENANCE_HEADERS)
+        nums=[int(r.get("maintenance_id","")[1:]) for r in rows if r.get("maintenance_id","").startswith("M") and r.get("maintenance_id","")[1:].isdigit()]
+        return f"M{max(nums,default=0)+1:03d}"
+
+    def resource_health_score(self,rid):
+        resources=read_csv("resources.csv",RESOURCE_HEADERS); complaints=read_csv("complaints.csv",COMPLAINT_HEADERS); maint=read_csv("maintenance.csv",MAINTENANCE_HEADERS)
+        r=next((x for x in resources if x.get("resource_id")==rid),None)
+        if not r: return 0,["Resource not found"]
+        score=100; reasons=[]
+        cond=r.get("condition","Good")
+        deductions={"Excellent":0,"Good":0,"Fair":10,"Poor":25,"Critical":40}
+        score-=deductions.get(cond,5)
+        if cond in ("Poor","Critical"): reasons.append(f"Condition: {cond}")
+        open_high=sum(1 for x in complaints if x.get("resource_id")==rid and x.get("priority") in ("High","Critical") and x.get("status") not in ("Resolved","Closed"))
+        score-=min(30,open_high*10)
+        if open_high: reasons.append(f"{open_high} unresolved high/critical complaint(s)")
+        overdue=0; today=datetime.now().date()
+        nxt=r.get("next_maintenance","").strip()
+        if nxt:
+            try:
+                overdue=(datetime.strptime(nxt,"%Y-%m-%d").date()<today)
+            except ValueError: overdue=True
+        if overdue: score-=20; reasons.append("Maintenance overdue/invalid")
+        count=sum(1 for x in maint if x.get("resource_id")==rid)
+        if count>=5: score-=10; reasons.append("High maintenance frequency")
+        elif count>=3: score-=5; reasons.append("Repeated maintenance history")
+        return max(0,min(100,score)),reasons
+
+    def build_resource_health(self):
+        bar=tk.Frame(self.health_tab,bg="#eef4fb"); bar.pack(fill="x",padx=15,pady=12)
+        tk.Button(bar,text="Refresh Health",command=self.refresh_resource_health,bg="#0b4f8a",fg="white",bd=0,padx=14,pady=8).pack(side="left")
+        tk.Button(bar,text="+ Maintenance Record",command=self.add_maintenance_record,bg="#376a92",fg="white",bd=0,padx=14,pady=8).pack(side="left",padx=6)
+        tk.Button(bar,text="Maintenance History",command=self.show_maintenance_history,bg="#657789",fg="white",bd=0,padx=14,pady=8).pack(side="left",padx=6)
+        tk.Button(bar,text="Health Alerts",command=self.show_health_alerts,bg="#8a5a0b",fg="white",bd=0,padx=14,pady=8).pack(side="left",padx=6)
+        self.health_tree=self.tree(self.health_tab,("resource_id","name","condition","status","maintenance_count","last_maintenance","next_maintenance","health_score","risk"))
+        self.refresh_resource_health()
+
+    def refresh_resource_health(self):
+        if not hasattr(self,"health_tree"): return
+        rows=read_csv("resources.csv",RESOURCE_HEADERS); maint=read_csv("maintenance.csv",MAINTENANCE_HEADERS)
+        for x in self.health_tree.get_children(): self.health_tree.delete(x)
+        for r in rows:
+            rid=r.get("resource_id",""); score,reasons=self.resource_health_score(rid); count=sum(x.get("resource_id")==rid for x in maint)
+            risk="High" if score<50 else "Medium" if score<75 else "Low"
+            self.health_tree.insert("","end",values=(rid,r.get("name",""),r.get("condition",""),r.get("status",""),count,r.get("last_maintenance",""),r.get("next_maintenance",""),f"{score}/100",risk))
+
+    def add_maintenance_record(self):
+        resources=read_csv("resources.csv",RESOURCE_HEADERS)
+        if not resources: messagebox.showwarning("No Resources","Add a resource first."); return
+        win=tk.Toplevel(self); win.title("Maintenance Record"); win.geometry("500x620"); win.configure(bg="white")
+        tk.Label(win,text="MAINTENANCE RECORD",font=("Segoe UI",18,"bold"),fg="#12395b",bg="white").pack(pady=20)
+        labels=("Date (YYYY-MM-DD)","Description","Cost","Performed By","Next Due (YYYY-MM-DD)")
+        keys=("date","description","cost","performed_by","next_due"); fields={}
+        rm=tk.StringVar()
+        ttk.Combobox(win,textvariable=rm,values=[f"{r.get('resource_id')} - {r.get('name')}" for r in resources],state="readonly").pack(fill="x",padx=30,pady=8)
+        mt=tk.StringVar(value="Preventive"); ttk.Combobox(win,textvariable=mt,values=MAINTENANCE_TYPES,state="readonly").pack(fill="x",padx=30,pady=8)
+        for label,key in zip(labels,keys):
+            tk.Label(win,text=label,bg="white",fg="#345",font=("Segoe UI",10,"bold")).pack(anchor="w",padx=30,pady=(8,3))
+            e=tk.Entry(win); e.pack(fill="x",padx=30,ipady=6); fields[key]=e
+        fields["date"].insert(0,datetime.now().strftime("%Y-%m-%d")); fields["performed_by"].insert(0,self.user.name)
+        def save():
+            selected=rm.get(); rid=selected.split(" - ",1)[0] if selected else ""
+            d=self.parse_report_date(fields["date"].get()); nxt=fields["next_due"].get().strip()
+            if not rid or not d or not fields["description"].get().strip() or not fields["cost"].get().strip(): messagebox.showwarning("Required","Complete resource, date, description and cost.",parent=win); return
+            try: cost=float(fields["cost"].get())
+            except ValueError: messagebox.showwarning("Invalid Cost","Enter a valid numeric maintenance cost.",parent=win); return
+            if cost<0: messagebox.showwarning("Invalid Cost","Cost cannot be negative.",parent=win); return
+            if nxt and not self.parse_report_date(nxt): messagebox.showwarning("Invalid Date","Next Due must be YYYY-MM-DD.",parent=win); return
+            row={"maintenance_id":self.maintenance_id(),"resource_id":rid,"date":d.strftime("%Y-%m-%d"),"type":mt.get(),"description":fields["description"].get().strip(),"cost":f"{cost:.2f}","performed_by":fields["performed_by"].get().strip(),"next_due":nxt}
+            append_csv("maintenance.csv",MAINTENANCE_HEADERS,row)
+            resources=read_csv("resources.csv",RESOURCE_HEADERS)
+            for r in resources:
+                if r.get("resource_id")==rid:
+                    r["last_maintenance"]=row["date"]
+                    if nxt: r["next_maintenance"]=nxt
+                    r["status"]="Available" if r.get("status")=="Maintenance" else r.get("status","Available")
+            rewrite_csv("resources.csv",RESOURCE_HEADERS,resources)
+            self.audit("MAINTENANCE_RECORDED",row["maintenance_id"]+" | "+rid+" | "+row["cost"])
+            self.notify("MAINTENANCE","Maintenance Recorded",f"{rid} maintenance recorded on {row['date']}.")
+            win.destroy(); self.refresh_resource_health(); self.refresh_resources(); self.refresh_alerts(); self.refresh_analytics(); self.refresh_notifications(); self.refresh_audit()
+        tk.Button(win,text="Save Maintenance Record",command=save,bg="#0b4f8a",fg="white",bd=0,padx=20,pady=9).pack(pady=22)
+
+    def show_maintenance_history(self):
+        win=tk.Toplevel(self); win.title("Maintenance History"); win.geometry("1050x560"); win.configure(bg="#eef4fb")
+        tk.Label(win,text="MAINTENANCE HISTORY & COST",font=("Segoe UI",17,"bold"),fg="#12395b",bg="#eef4fb").pack(pady=15)
+        tree=self.tree(win,MAINTENANCE_HEADERS)
+        rows=read_csv("maintenance.csv",MAINTENANCE_HEADERS)
+        for r in reversed(rows): tree.insert("","end",values=tuple(r.get(k,"") for k in MAINTENANCE_HEADERS))
+        total=sum(float(r.get("cost",0) or 0) for r in rows if str(r.get("cost","")).replace(".","",1).isdigit())
+        tk.Label(win,text=f"Total recorded maintenance cost: {total:.2f}",bg="#eef4fb",fg="#12395b",font=("Segoe UI",11,"bold")).pack(pady=10)
+
+    def show_health_alerts(self):
+        rows=read_csv("resources.csv",RESOURCE_HEADERS); alerts=[]
+        for r in rows:
+            score,reasons=self.resource_health_score(r.get("resource_id",""))
+            if score<75: alerts.append(f"{r.get('resource_id')} - {r.get('name')}: {score}/100 | "+("; ".join(reasons) or "Review resource"))
+        win=tk.Toplevel(self); win.title("Resource Health Alerts"); win.geometry("850x430"); win.configure(bg="white")
+        tk.Label(win,text="RESOURCE HEALTH ALERTS",font=("Segoe UI",16,"bold"),fg="#12395b",bg="white").pack(pady=15)
+        txt=tk.Text(win,font=("Consolas",10),bg="white",fg="#345",bd=0,padx=20,pady=15); txt.pack(fill="both",expand=True,padx=20,pady=10)
+        txt.insert("1.0","No elevated health risks detected." if not alerts else "\n".join("• "+x for x in alerts))
+        self.audit("HEALTH_ALERT_CHECK",f"{len(alerts)} resource health alert(s)")
 
     def build_complaints(self):
         bar=tk.Frame(self.complaint_tab);bar.pack(fill="x",padx=15,pady=12);tk.Button(bar,text="+ New Complaint",command=self.add_complaint,bg="#0b4f8a",fg="white",bd=0,padx=15,pady=8).pack(side="left");tk.Button(bar,text="Refresh",command=self.refresh_complaints,padx=15,pady=7).pack(side="left",padx=8)
