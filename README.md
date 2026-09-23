@@ -143,3 +143,19 @@ Version 22 adds:
 - Maintenance records update resource maintenance dates and status
 - Maintenance data included in backup and restore
 - New data file: `data/maintenance.csv`
+
+
+## Version 23 — Advanced Maintenance Planning & Cost Analytics
+
+Version 23 adds:
+- Dedicated Maintenance Planning dashboard
+- Planned/In Progress/Completed/Cancelled maintenance workflow
+- Preventive maintenance planning
+- Technician/assigned-to tracking
+- Estimated maintenance cost tracking
+- Resource-wise maintenance expenditure
+- Maintenance-type cost analysis
+- Monthly maintenance cost trends
+- Maintenance calendar
+- Maintenance workload visibility
+- Cost analytics integrated with maintenance history
