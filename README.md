@@ -2,6 +2,15 @@
 
 A Python/Tkinter campus utility management system for resources, maintenance, complaints, usage, reports, analytics, alerts, backups, audit history, administration, and dashboard monitoring.
 
+## Version 12 — Advanced Visual Analytics
+- Native Tkinter charts with no external dependencies
+- Resource utilization/status chart
+- Complaint priority chart
+- Resource usage ranking chart
+- Maintenance summary and upcoming maintenance count
+- Complaint resolution-rate metric
+- Responsive chart redraw after window resizing
+
 ## Version 11 — Professional Dashboard
 - Dedicated Dashboard tab
 - Six KPI cards: Resources, Available, In Use, Complaints, Open Complaints, Alerts
