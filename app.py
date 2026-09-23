@@ -89,6 +89,43 @@ class SmartCampusApp(tk.Tk):
             self.build_backup_controls(); self.build_admin_center()
         self.build_resources(); self.build_complaints(); self.build_usage(); self.build_reports(); self.build_analytics(); self.build_alerts(); self.build_audit()
         if self.user.role=="Admin":self.build_users()
+    def build_professional_dashboard(self,parent):
+        frame=tk.Frame(parent,bg="#eef4fb"); frame.pack(fill="both",expand=True)
+        top=tk.Frame(frame,bg="#eef4fb"); top.pack(fill="x",pady=(0,12))
+        self.kpi_vars={}
+        for title,key in (("Resources","resources"),("Available","available"),("In Use","inuse"),("Complaints","complaints"),("Open Complaints","open"),("Alerts","alerts")):
+            card=tk.Frame(top,bg="white",highlightthickness=1,highlightbackground="#d8e2ee"); card.pack(side="left",fill="x",expand=True,padx=4)
+            tk.Label(card,text=title,bg="white",fg="#60758a",font=("Segoe UI",9,"bold")).pack(anchor="w",padx=12,pady=(10,2))
+            v=tk.StringVar(value="0"); self.kpi_vars[key]=v
+            tk.Label(card,textvariable=v,bg="white",fg="#0b4f8a",font=("Segoe UI",21,"bold")).pack(anchor="w",padx=12,pady=(0,10))
+        lower=tk.Frame(frame,bg="#eef4fb"); lower.pack(fill="both",expand=True)
+        left=tk.Frame(lower,bg="white",highlightthickness=1,highlightbackground="#d8e2ee"); left.pack(side="left",fill="both",expand=True,padx=(4,8))
+        right=tk.Frame(lower,bg="white",highlightthickness=1,highlightbackground="#d8e2ee"); right.pack(side="left",fill="both",expand=True,padx=(8,4))
+        tk.Label(left,text="Resource Status",font=("Segoe UI",13,"bold"),fg="#12395b",bg="white").pack(anchor="w",padx=15,pady=12)
+        self.status_text=tk.Text(left,font=("Consolas",11),bg="white",fg="#345",bd=0,height=10,padx=15,pady=5); self.status_text.pack(fill="both",expand=True,padx=10,pady=5)
+        tk.Label(right,text="Recent Activity",font=("Segoe UI",13,"bold"),fg="#12395b",bg="white").pack(anchor="w",padx=15,pady=12)
+        self.activity_text=tk.Text(right,font=("Consolas",10),bg="white",fg="#345",bd=0,height=10,padx=15,pady=5); self.activity_text.pack(fill="both",expand=True,padx=10,pady=5)
+        tk.Button(frame,text="↻ Refresh Dashboard",command=self.refresh_professional_dashboard,bg="#0b4f8a",fg="white",bd=0,padx=16,pady=8).pack(anchor="e",pady=10)
+        self.refresh_professional_dashboard()
+
+    def refresh_professional_dashboard(self):
+        resources=read_csv("resources.csv",RESOURCE_HEADERS); complaints=read_csv("complaints.csv",COMPLAINT_HEADERS); audits=read_csv("audit.csv",AUDIT_HEADERS)
+        alerts=0; today=datetime.now().date()
+        for r in resources:
+            nxt=r.get("next_maintenance","").strip()
+            if r.get("status")=="Out of Service": alerts+=1
+            if nxt:
+                try:
+                    if (datetime.strptime(nxt,"%Y-%m-%d").date()-today).days<=7: alerts+=1
+                except ValueError: alerts+=1
+        alerts+=sum(1 for x in complaints if x.get("priority") in ("High","Critical") and x.get("status") not in ("Resolved","Closed"))
+        vals={"resources":len(resources),"available":sum(r.get("status")=="Available" for r in resources),"inuse":sum(r.get("status")=="In Use" for r in resources),"complaints":len(complaints),"open":sum(x.get("status") not in ("Resolved","Closed") for x in complaints),"alerts":alerts}
+        for k,v in vals.items(): self.kpi_vars[k].set(str(v))
+        lines=["AVAILABLE     : "+str(vals["available"]), "IN USE        : "+str(vals["inuse"]), "MAINTENANCE   : "+str(sum(r.get("status")=="Maintenance" for r in resources)), "OUT OF SERVICE: "+str(sum(r.get("status")=="Out of Service" for r in resources))]
+        self.status_text.delete("1.0","end"); self.status_text.insert("1.0","\n".join(lines))
+        recent=list(reversed(audits[-10:]))
+        self.activity_text.delete("1.0","end"); self.activity_text.insert("1.0","\n".join(f"{x.get('timestamp','')} | {x.get('username','')} | {x.get('action','')}" for x in recent) or "No activity recorded.")
+
     def build_cards(self,parent):
         self.card_vars={}
         for title,file,headers in (("Resources","resources.csv",RESOURCE_HEADERS),("Complaints","complaints.csv",COMPLAINT_HEADERS),("Usage Records","usage.csv",USAGE_HEADERS)):
