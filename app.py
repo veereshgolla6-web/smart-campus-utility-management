@@ -7,7 +7,7 @@ import csv
 from models import User
 from storage import read_csv, append_csv, rewrite_csv
 
-RESOURCE_HEADERS=["resource_id","name","category","location","status","last_maintenance","next_maintenance"]
+RESOURCE_HEADERS=["resource_id","name","category","location","status","last_maintenance","next_maintenance","capacity","department","condition","assigned_to","notes"]
 COMPLAINT_HEADERS=["complaint_id","resource_id","title","description","category","priority","reported_by","status","assigned_to"]
 USAGE_HEADERS=["usage_id","resource_id","used_by","purpose","date","duration"]
 USER_HEADERS=["username","password","role","name","status","last_login"]
@@ -410,57 +410,53 @@ class SmartCampusApp(tk.Tk):
         self.alert_text.delete("1.0","end"); self.alert_text.insert("1.0","SMART CAMPUS ALERTS\n"+"="*60+"\n\n"+("\n".join("• "+a for a in alerts) if alerts else "No active alerts."))
     def build_resources(self):
         bar=tk.Frame(self.resource_tab); bar.pack(fill="x",padx=15,pady=12)
-        if self.user.role=="Admin":tk.Button(bar,text="+ Add Resource",command=self.add_resource,bg="#0b4f8a",fg="white",bd=0,padx=15,pady=8).pack(side="left")
-        tk.Button(bar,text="Refresh",command=self.refresh_resources,padx=15,pady=7).pack(side="left",padx=8)
-        if self.user.role=="Admin":
-            tk.Button(bar,text="Update Status",command=self.update_resource_status,bg="#376a92",fg="white",bd=0,padx=12,pady=7).pack(side="left",padx=5); tk.Button(bar,text="Maintenance",command=self.update_maintenance,bg="#376a92",fg="white",bd=0,padx=12,pady=7).pack(side="left",padx=5)
-        tk.Label(bar,text="Search:",font=("Segoe UI",10,"bold")).pack(side="left",padx=(12,4)); self.resource_search=tk.StringVar(); tk.Entry(bar,textvariable=self.resource_search,width=22).pack(side="left",ipady=5); self.resource_search.trace_add("write",lambda *a:self.refresh_resources()); self.resource_tree=self.tree(self.resource_tab,("resource_id","name","category","location","status","last_maintenance","next_maintenance")); self.refresh_resources()
+        tk.Button(bar,text="+ Add Resource",command=self.add_resource,bg="#0b4f8a",fg="white",bd=0,padx=15,pady=8).pack(side="left")
+        tk.Button(bar,text="Advanced Search",command=self.search_resources,bg="#376a92",fg="white",bd=0,padx=15,pady=8).pack(side="left",padx=8)
+        tk.Button(bar,text="Resource Details",command=self.edit_resource_details,bg="#657789",fg="white",bd=0,padx=15,pady=8).pack(side="left",padx=8)
+        self.resource_search=tk.StringVar(); tk.Entry(bar,textvariable=self.resource_search,width=28).pack(side="right",padx=5)
+        tk.Button(bar,text="Search",command=self.refresh_resources,bg="#0b4f8a",fg="white",bd=0,padx=10,pady=6).pack(side="right")
+        self.resource_tree=self.tree(self.resource_tab,RESOURCE_HEADERS); self.refresh_resources()
     def refresh_resources(self):
-        if not hasattr(self,"resource_tree"):return
-        for x in self.resource_tree.get_children():self.resource_tree.delete(x)
-        term=getattr(self,"resource_search",tk.StringVar()).get().lower().strip()
-        for r in read_csv("resources.csv",RESOURCE_HEADERS):
-            if not term or term in " ".join(r.values()).lower():self.resource_tree.insert("","end",values=tuple(r.get(k,"") for k in RESOURCE_HEADERS))
-        self.refresh_cards()
-    def update_resource_status(self):
-        item=self.resource_tree.selection()
-        if not item:messagebox.showwarning("Select Resource","Select a resource first.");return
-        rid=self.resource_tree.item(item[0],"values")[0]; rows=read_csv("resources.csv",RESOURCE_HEADERS); current=next((r for r in rows if r.get("resource_id")==rid),None)
-        if not current:return
-        win=tk.Toplevel(self); win.title("Update Resource Status"); win.geometry("360x220"); status=tk.StringVar(value=current.get("status","Available")); ttk.Combobox(win,textvariable=status,values=RESOURCE_STATUSES,state="readonly").pack(fill="x",padx=35,pady=35)
+        if not hasattr(self,"resource_tree"): return
+        for x in self.resource_tree.get_children(): self.resource_tree.delete(x)
+        q=self.resource_search.get().strip().lower()
+        for row in read_csv("resources.csv",RESOURCE_HEADERS):
+            if q and q not in " ".join(row.get(k,"") for k in RESOURCE_HEADERS).lower(): continue
+            self.resource_tree.insert("","end",values=tuple(row.get(k,"") for k in RESOURCE_HEADERS))
+    def search_resources(self):
+        self.resource_search.set("")
+        win=tk.Toplevel(self); win.title("Advanced Resource Search"); win.geometry("430x300"); win.configure(bg="white")
+        fields={}
+        for label,key in (("Category","category"),("Department","department"),("Location","location"),("Condition","condition")):
+            tk.Label(win,text=label,bg="white",fg="#345").pack(anchor="w",padx=30,pady=(14,2))
+            e=tk.Entry(win); e.pack(fill="x",padx=30); fields[key]=e
+        def apply():
+            rows=read_csv("resources.csv",RESOURCE_HEADERS)
+            for key,e in fields.items():
+                q=e.get().strip().lower()
+                if q: rows=[r for r in rows if q in r.get(key,"").lower()]
+            for x in self.resource_tree.get_children(): self.resource_tree.delete(x)
+            for row in rows:self.resource_tree.insert("","end",values=tuple(row.get(k,"") for k in RESOURCE_HEADERS))
+            win.destroy()
+        tk.Button(win,text="Apply Search",command=apply,bg="#0b4f8a",fg="white",bd=0,padx=20,pady=8).pack(pady=20)
+    def edit_resource_details(self):
+        sel=self.resource_tree.selection()
+        if not sel: messagebox.showwarning("Select Resource","Select a resource first."); return
+        rid=self.resource_tree.item(sel[0],"values")[0]; rows=read_csv("resources.csv",RESOURCE_HEADERS); row=next((r for r in rows if r.get("resource_id")==rid),None)
+        if not row:return
+        win=tk.Toplevel(self); win.title("Resource Details"); win.geometry("470x650"); win.configure(bg="white"); fields={}
+        editable=("name","category","location","capacity","department","condition","assigned_to","notes")
+        for key in editable:
+            tk.Label(win,text=key.replace("_"," ").title(),bg="white",fg="#345").pack(anchor="w",padx=30,pady=(10,2))
+            e=tk.Entry(win); e.pack(fill="x",padx=30); e.insert(0,row.get(key,"")); fields[key]=e
         def save():
+            cap=fields["capacity"].get().strip()
+            if cap and (not cap.isdigit() or int(cap)<0): messagebox.showwarning("Invalid Capacity","Capacity must be a non-negative number.",parent=win); return
             for r in rows:
-                if r.get("resource_id")==rid:r["status"]=status.get()
-            rewrite_csv("resources.csv",RESOURCE_HEADERS,rows); self.audit("RESOURCE_STATUS_CHANGED",f"{rid} -> {status.get()}"); win.destroy(); self.refresh_resources(); self.refresh_alerts(); self.refresh_analytics(); self.refresh_audit()
-        tk.Button(win,text="Save Status",command=save,bg="#0b4f8a",fg="white",bd=0,padx=20,pady=8).pack()
-    def add_resource(self):
-        win=tk.Toplevel(self); win.title("Add Resource"); win.geometry("430x390"); win.configure(bg="white"); fields=[]
-        for label in ("Resource Name","Category","Location"):
-            tk.Label(win,text=label,bg="white",fg="#345",font=("Segoe UI",10,"bold")).pack(anchor="w",padx=30,pady=(18,3)); e=tk.Entry(win,font=("Segoe UI",11)); e.pack(fill="x",padx=30,ipady=7); fields.append(e)
-        def save():
-            rows=read_csv("resources.csv",RESOURCE_HEADERS); nums=[int(r.get("resource_id","")[1:]) for r in rows if r.get("resource_id","").startswith("R") and r.get("resource_id","")[1:].isdigit()]; rid=f"R{max(nums,default=0)+1:03d}"; name,cat,loc=[e.get().strip() for e in fields]
-            if not name or not loc:messagebox.showwarning("Required","Enter resource name and location.",parent=win);return
-            append_csv("resources.csv",RESOURCE_HEADERS,{"resource_id":rid,"name":name,"category":cat or "Other","location":loc,"status":"Available","last_maintenance":"","next_maintenance":""}); self.audit("RESOURCE_CREATED",rid); win.destroy(); self.refresh_resources(); self.refresh_analytics(); self.refresh_audit()
-        tk.Button(win,text="Save Resource",command=save,bg="#0b4f8a",fg="white",bd=0,padx=20,pady=9).pack(pady=25)
-    def update_maintenance(self):
-        item=self.resource_tree.selection()
-        if not item:messagebox.showwarning("Select Resource","Select a resource first.");return
-        rid=self.resource_tree.item(item[0],"values")[0]; rows=read_csv("resources.csv",RESOURCE_HEADERS); current=next((x for x in rows if x.get("resource_id")==rid),None)
-        if not current:return
-        win=tk.Toplevel(self); win.title("Maintenance Schedule"); win.geometry("420x330"); win.configure(bg="white"); tk.Label(win,text=f"Maintenance: {rid}",font=("Segoe UI",13,"bold"),bg="white",fg="#12395b").pack(pady=18)
-        tk.Label(win,text="Last Maintenance (YYYY-MM-DD)",bg="white").pack(anchor="w",padx=30,pady=(8,3)); last=tk.Entry(win); last.insert(0,current.get("last_maintenance","")); last.pack(fill="x",padx=30,ipady=6)
-        tk.Label(win,text="Next Maintenance (YYYY-MM-DD)",bg="white").pack(anchor="w",padx=30,pady=(14,3)); nxt=tk.Entry(win); nxt.insert(0,current.get("next_maintenance","")); nxt.pack(fill="x",padx=30,ipady=6)
-        def save():
-            lv=last.get().strip(); nv=nxt.get().strip()
-            for label,value in (("Last Maintenance",lv),("Next Maintenance",nv)):
-                if value:
-                    try:datetime.strptime(value,"%Y-%m-%d")
-                    except ValueError:messagebox.showerror("Invalid Date",f"{label} must use YYYY-MM-DD.",parent=win);return
-            if lv and nv and nv<lv:messagebox.showerror("Invalid Schedule","Next maintenance cannot be earlier than last maintenance.",parent=win);return
-            for x in rows:
-                if x.get("resource_id")==rid:x["last_maintenance"]=lv;x["next_maintenance"]=nv
-            rewrite_csv("resources.csv",RESOURCE_HEADERS,rows);self.audit("MAINTENANCE_UPDATED",rid);win.destroy();self.refresh_resources();self.refresh_alerts();self.refresh_audit()
-        tk.Button(win,text="Save Schedule",command=save,bg="#0b4f8a",fg="white",bd=0,padx=20,pady=9).pack(pady=22)
+                if r.get("resource_id")==rid:
+                    for key,e in fields.items(): r[key]=e.get().strip()
+            rewrite_csv("resources.csv",RESOURCE_HEADERS,rows); self.audit("RESOURCE_DETAILS_UPDATED",rid); win.destroy(); self.refresh_resources(); self.refresh_professional_dashboard()
+        tk.Button(win,text="Save Resource Details",command=save,bg="#0b4f8a",fg="white",bd=0,padx=20,pady=9).pack(pady=20)
     def build_complaints(self):
         bar=tk.Frame(self.complaint_tab);bar.pack(fill="x",padx=15,pady=12);tk.Button(bar,text="+ New Complaint",command=self.add_complaint,bg="#0b4f8a",fg="white",bd=0,padx=15,pady=8).pack(side="left");tk.Button(bar,text="Refresh",command=self.refresh_complaints,padx=15,pady=7).pack(side="left",padx=8)
         if self.user.role in ("Admin","Faculty"):tk.Button(bar,text="Update Selected",command=self.update_complaint,bg="#376a92",fg="white",bd=0,padx=12,pady=7).pack(side="left",padx=5)
