@@ -2,6 +2,14 @@
 
 A Python/Tkinter campus utility management system for resources, maintenance, complaints, usage, reports, analytics, alerts, backups, audit history, administration, and dashboard monitoring.
 
+## Version 16 — User Profile & Session Controls
+- My Profile panel
+- Display-name update with validation
+- Session start information
+- Profile changes recorded in the audit trail
+- Logout confirmation dialog
+- Explicit LOGOUT audit event
+
 ## Version 15 — User Experience & Security Upgrade
 - Password visibility toggle on login
 - Five-attempt login protection per application session
