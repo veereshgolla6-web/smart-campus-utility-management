@@ -85,8 +85,35 @@ class SmartCampusApp(tk.Tk):
         if not row:
             self.login_attempts+=1; messagebox.showerror("Login Failed",f"Invalid username or password. Attempts remaining: {max(0,5-self.login_attempts)}"); return
         self.login_attempts=0; self.user=User(u,p,row["role"],row["name"]); self.session_started=datetime.now(); self.show_dashboard(); self.audit("LOGIN","Successful login")
+    def confirm_logout(self):
+        if messagebox.askyesno("Confirm Logout","Are you sure you want to logout?"):
+            self.audit("LOGOUT","User logged out")
+            self.user=None
+            self.session_started=None
+            self.show_login()
+
+    def user_profile(self):
+        win=tk.Toplevel(self); win.title("My Profile"); win.geometry("460x430"); win.configure(bg="white")
+        tk.Label(win,text="MY PROFILE",font=("Segoe UI",18,"bold"),fg="#12395b",bg="white").pack(pady=(25,15))
+        fields={}
+        for label,key,value,editable in (("Username","username",self.user.username,False),("Display Name","name",self.user.name,True),("Role","role",self.user.role,False)):
+            tk.Label(win,text=label,bg="white",fg="#345",font=("Segoe UI",10,"bold")).pack(anchor="w",padx=35,pady=(10,3))
+            e=tk.Entry(win,font=("Segoe UI",11)); e.pack(fill="x",padx=35,ipady=7); e.insert(0,value); fields[key]=e
+            if not editable: e.config(state="readonly")
+        tk.Label(win,text=f"Session started: {self.session_started.strftime('%Y-%m-%d %H:%M:%S') if self.session_started else 'N/A'}",bg="white",fg="#71859a").pack(pady=18)
+        def save():
+            name=fields["name"].get().strip()
+            if not name: messagebox.showwarning("Required","Display Name cannot be empty.",parent=win); return
+            rows=read_csv("users.csv",USER_HEADERS)
+            for row in rows:
+                if row.get("username")==self.user.username: row["name"]=name
+            rewrite_csv("users.csv",USER_HEADERS,rows); old=self.user.name; self.user.name=name
+            self.audit("PROFILE_UPDATED",f"Display name changed from {old} to {name}")
+            win.destroy(); self.show_dashboard()
+        tk.Button(win,text="Save Profile",command=save,bg="#0b4f8a",fg="white",bd=0,padx=20,pady=9).pack()
+
     def show_dashboard(self):
-        self.clear(); top=tk.Frame(self,bg="#0b4f8a",height=76); top.pack(fill="x"); tk.Label(top,text="Smart Campus Utility Management",font=("Segoe UI",20,"bold"),fg="white",bg="#0b4f8a").pack(side="left",padx=25,pady=18); tk.Label(top,text=f"{self.user.name}  •  {self.user.role}  •  Login: {self.session_started.strftime("%H:%M") if self.session_started else ""}",font=("Segoe UI",10),fg="white",bg="#0b4f8a").pack(side="right",padx=15); tk.Button(top,text="Logout",command=self.show_login,bg="#083b68",fg="white",bd=0,padx=15,pady=8).pack(side="right")
+        self.clear(); top=tk.Frame(self,bg="#0b4f8a",height=76); top.pack(fill="x"); tk.Label(top,text="Smart Campus Utility Management",font=("Segoe UI",20,"bold"),fg="white",bg="#0b4f8a").pack(side="left",padx=25,pady=18); tk.Label(top,text=f"{self.user.name}  •  {self.user.role}  •  Login: {self.session_started.strftime("%H:%M") if self.session_started else ""}",font=("Segoe UI",10),fg="white",bg="#0b4f8a").pack(side="right",padx=15); tk.Button(top,text="Logout",command=self.confirm_logout,bg="#083b68",fg="white",bd=0,padx=15,pady=8).pack(side="right"); tk.Button(top,text="My Profile",command=self.user_profile,bg="#376a92",fg="white",bd=0,padx=15,pady=8).pack(side="right",padx=5)
         body=tk.Frame(self,bg="#eef4fb"); body.pack(fill="both",expand=True,padx=20,pady=20); self.build_cards(body); notebook=ttk.Notebook(body); notebook.pack(fill="both",expand=True,pady=(18,0))
         self.home_tab=ttk.Frame(notebook); self.resource_tab=ttk.Frame(notebook); self.complaint_tab=ttk.Frame(notebook); self.usage_tab=ttk.Frame(notebook); self.report_tab=ttk.Frame(notebook); self.analytics_tab=ttk.Frame(notebook); self.alert_tab=ttk.Frame(notebook); self.audit_tab=ttk.Frame(notebook)
         for tab,text in ((self.home_tab,"Dashboard"),(self.resource_tab,"Resources"),(self.complaint_tab,"Complaints"),(self.usage_tab,"Usage"),(self.report_tab,"Reports"),(self.analytics_tab,"Analytics"),(self.alert_tab,"Alerts"),(self.audit_tab,"Audit")):notebook.add(tab,text=f"  {text}  ")
