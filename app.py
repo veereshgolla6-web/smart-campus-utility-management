@@ -1,6 +1,8 @@
 import tkinter as tk
 from tkinter import ttk, messagebox
 from datetime import datetime
+from pathlib import Path
+import shutil
 from models import User
 from storage import read_csv, append_csv, rewrite_csv
 
@@ -12,6 +14,8 @@ CATEGORIES=("Electrical","Computer/IT","Projector","Furniture","Laboratory Equip
 PRIORITIES=("Low","Medium","High","Critical")
 STATUSES=("Pending","Assigned","In Progress","Resolved","Closed")
 RESOURCE_STATUSES=("Available","In Use","Maintenance","Out of Service")
+DATA_FILES=("users.csv","resources.csv","complaints.csv","usage.csv")
+AUDIT_HEADERS=("timestamp","username","role","action","details")
 
 class SmartCampusApp(tk.Tk):
     def __init__(self):
@@ -20,6 +24,47 @@ class SmartCampusApp(tk.Tk):
         try:self.style.theme_use("clam")
         except tk.TclError:pass
         self.style.configure("Treeview",rowheight=30,font=("Segoe UI",10)); self.style.configure("Treeview.Heading",font=("Segoe UI",10,"bold")); self.style.configure("TNotebook.Tab",padding=(18,10),font=("Segoe UI",10,"bold")); self.show_login()
+    def audit(self,action,details=""):
+        append_csv("audit.csv",AUDIT_HEADERS,{"timestamp":datetime.now().strftime("%Y-%m-%d %H:%M:%S"),"username":self.user.username if self.user else "SYSTEM","role":self.user.role if self.user else "SYSTEM","action":action,"details":details})
+
+    def backup_data(self):
+        if self.user.role!="Admin": messagebox.showerror("Access Denied","Only Admin can create backups."); return
+        src=Path("data"); src.mkdir(exist_ok=True); stamp=datetime.now().strftime("%Y%m%d_%H%M%S"); dest=Path("backups")/f"backup_{stamp}"; dest.mkdir(parents=True,exist_ok=True)
+        for name in DATA_FILES+("audit.csv",):
+            p=src/name
+            if p.exists(): shutil.copy2(p,dest/name)
+        self.audit("BACKUP_CREATED",str(dest)); messagebox.showinfo("Backup Complete",f"Backup created successfully:\\n{dest}")
+
+    def restore_data(self):
+        if self.user.role!="Admin": messagebox.showerror("Access Denied","Only Admin can restore data."); return
+        root=Path("backups")
+        if not root.exists(): messagebox.showwarning("No Backups","No backup folder exists yet."); return
+        backups=sorted([p for p in root.iterdir() if p.is_dir()],reverse=True)
+        if not backups: messagebox.showwarning("No Backups","No backup sets were found."); return
+        win=tk.Toplevel(self); win.title("Restore Backup"); win.geometry("500x250"); win.configure(bg="white")
+        tk.Label(win,text="Select backup to restore",font=("Segoe UI",12,"bold"),bg="white",fg="#12395b").pack(pady=20)
+        choice=tk.StringVar(value=backups[0].name); ttk.Combobox(win,textvariable=choice,values=[p.name for p in backups],state="readonly").pack(fill="x",padx=35,pady=10)
+        def restore():
+            selected=root/choice.get()
+            if not selected.exists(): return
+            if not messagebox.askyesno("Confirm Restore","Restore this backup? Current data will be replaced.",parent=win): return
+            src=Path("data"); src.mkdir(exist_ok=True)
+            for name in DATA_FILES+("audit.csv",):
+                p=selected/name
+                if p.exists(): shutil.copy2(p,src/name)
+            self.audit("BACKUP_RESTORED",selected.name); win.destroy(); messagebox.showinfo("Restore Complete","Backup restored. The application will return to the login screen."); self.show_login()
+        tk.Button(win,text="Restore Selected Backup",command=restore,bg="#0b4f8a",fg="white",bd=0,padx=20,pady=9).pack(pady=20)
+
+    def build_audit(self):
+        bar=tk.Frame(self.audit_tab); bar.pack(fill="x",padx=15,pady=12)
+        tk.Button(bar,text="Refresh Audit Log",command=self.refresh_audit,bg="#0b4f8a",fg="white",bd=0,padx=15,pady=8).pack(side="left")
+        self.audit_tree=self.tree(self.audit_tab,AUDIT_HEADERS); self.refresh_audit()
+
+    def refresh_audit(self):
+        if not hasattr(self,"audit_tree"): return
+        for x in self.audit_tree.get_children(): self.audit_tree.delete(x)
+        for row in reversed(read_csv("audit.csv",AUDIT_HEADERS)): self.audit_tree.insert("","end",values=tuple(row.get(k,"") for k in AUDIT_HEADERS))
+
     def clear(self):
         for w in self.winfo_children():w.destroy()
     def show_login(self):
@@ -32,14 +77,16 @@ class SmartCampusApp(tk.Tk):
     def login(self):
         users=read_csv("users.csv",USER_HEADERS); u=self.login_user.get().strip(); p=self.login_pass.get().strip(); row=next((x for x in users if x["username"]==u and x["password"]==p),None)
         if not row:messagebox.showerror("Login Failed","Invalid username or password."); return
-        self.user=User(u,p,row["role"],row["name"]); self.show_dashboard()
+        self.user=User(u,p,row["role"],row["name"]); self.show_dashboard(); self.audit("LOGIN","Successful login")
     def show_dashboard(self):
         self.clear(); top=tk.Frame(self,bg="#0b4f8a",height=76); top.pack(fill="x"); tk.Label(top,text="Smart Campus Utility Management",font=("Segoe UI",20,"bold"),fg="white",bg="#0b4f8a").pack(side="left",padx=25,pady=18); tk.Label(top,text=f"{self.user.name}  •  {self.user.role}",font=("Segoe UI",10),fg="white",bg="#0b4f8a").pack(side="right",padx=15); tk.Button(top,text="Logout",command=self.show_login,bg="#083b68",fg="white",bd=0,padx=15,pady=8).pack(side="right")
         body=tk.Frame(self,bg="#eef4fb"); body.pack(fill="both",expand=True,padx=20,pady=20); self.build_cards(body); notebook=ttk.Notebook(body); notebook.pack(fill="both",expand=True,pady=(18,0))
-        self.resource_tab=ttk.Frame(notebook); self.complaint_tab=ttk.Frame(notebook); self.usage_tab=ttk.Frame(notebook); self.report_tab=ttk.Frame(notebook); self.analytics_tab=ttk.Frame(notebook); self.alert_tab=ttk.Frame(notebook)
-        for tab,text in ((self.resource_tab,"Resources"),(self.complaint_tab,"Complaints"),(self.usage_tab,"Usage"),(self.report_tab,"Reports"),(self.analytics_tab,"Analytics"),(self.alert_tab,"Alerts")):notebook.add(tab,text=f"  {text}  ")
-        if self.user.role=="Admin":self.user_tab=ttk.Frame(notebook); notebook.add(self.user_tab,text="  Users  ")
-        self.build_resources(); self.build_complaints(); self.build_usage(); self.build_reports(); self.build_analytics(); self.build_alerts()
+        self.resource_tab=ttk.Frame(notebook); self.complaint_tab=ttk.Frame(notebook); self.usage_tab=ttk.Frame(notebook); self.report_tab=ttk.Frame(notebook); self.analytics_tab=ttk.Frame(notebook); self.alert_tab=ttk.Frame(notebook); self.audit_tab=ttk.Frame(notebook)
+        for tab,text in ((self.resource_tab,"Resources"),(self.complaint_tab,"Complaints"),(self.usage_tab,"Usage"),(self.report_tab,"Reports"),(self.analytics_tab,"Analytics"),(self.alert_tab,"Alerts"),(self.audit_tab,"Audit")):notebook.add(tab,text=f"  {text}  ")
+        if self.user.role=="Admin":
+            self.user_tab=ttk.Frame(notebook); notebook.add(self.user_tab,text="  Users  ")
+            self.build_backup_controls()
+        self.build_resources(); self.build_complaints(); self.build_usage(); self.build_reports(); self.build_analytics(); self.build_alerts(); self.build_audit()
         if self.user.role=="Admin":self.build_users()
     def build_cards(self,parent):
         self.card_vars={}
@@ -52,6 +99,11 @@ class SmartCampusApp(tk.Tk):
         t=ttk.Treeview(parent,columns=columns,show="headings")
         for c in columns:t.heading(c,text=c.replace("_"," ").title()); t.column(c,width=135,anchor="center")
         t.pack(fill="both",expand=True,padx=15,pady=10); return t
+    def build_backup_controls(self):
+        bar=tk.Frame(self.user_tab); bar.pack(fill="x",padx=15,pady=(0,12))
+        tk.Button(bar,text="Create Backup",command=self.backup_data,bg="#0b4f8a",fg="white",bd=0,padx=15,pady=8).pack(side="left")
+        tk.Button(bar,text="Restore Backup",command=self.restore_data,bg="#376a92",fg="white",bd=0,padx=15,pady=8).pack(side="left",padx=8)
+
     def build_users(self):
         bar=tk.Frame(self.user_tab); bar.pack(fill="x",padx=15,pady=12); tk.Button(bar,text="+ Add User",command=self.add_user,bg="#0b4f8a",fg="white",bd=0,padx=15,pady=8).pack(side="left"); tk.Button(bar,text="Refresh",command=self.refresh_users,padx=15,pady=7).pack(side="left",padx=8); self.user_tree=self.tree(self.user_tab,("username","role","name")); self.refresh_users()
     def refresh_users(self):
@@ -66,7 +118,7 @@ class SmartCampusApp(tk.Tk):
             rows=read_csv("users.csv",USER_HEADERS); vals={k:e.get().strip() for k,e in fields.items()}
             if not all(vals.values()):messagebox.showwarning("Required","Complete all fields.",parent=win); return
             if any(x["username"].lower()==vals["username"].lower() for x in rows):messagebox.showerror("Duplicate","Username already exists.",parent=win); return
-            vals["role"]=role.get(); append_csv("users.csv",USER_HEADERS,vals); win.destroy(); self.refresh_users()
+            vals["role"]=role.get(); append_csv("users.csv",USER_HEADERS,vals); self.audit("USER_CREATED",vals["username"]); win.destroy(); self.refresh_users(); self.refresh_audit()
         tk.Button(win,text="Create User",command=save,bg="#0b4f8a",fg="white",bd=0,padx=20,pady=9).pack(pady=25)
     def build_analytics(self):
         bar=tk.Frame(self.analytics_tab); bar.pack(fill="x",padx=15,pady=12); tk.Button(bar,text="Refresh Analytics",command=self.refresh_analytics,bg="#0b4f8a",fg="white",bd=0,padx=15,pady=8).pack(side="left"); self.analytics_text=tk.Text(self.analytics_tab,font=("Consolas",11),bg="white",fg="#12395b",bd=0,padx=20,pady=20); self.analytics_text.pack(fill="both",expand=True,padx=15,pady=10); self.refresh_analytics()
@@ -118,7 +170,7 @@ class SmartCampusApp(tk.Tk):
         def save():
             for r in rows:
                 if r.get("resource_id")==rid:r["status"]=status.get()
-            rewrite_csv("resources.csv",RESOURCE_HEADERS,rows); win.destroy(); self.refresh_resources(); self.refresh_alerts(); self.refresh_analytics()
+            rewrite_csv("resources.csv",RESOURCE_HEADERS,rows); self.audit("RESOURCE_STATUS_CHANGED",f"{rid} -> {status.get()}"); win.destroy(); self.refresh_resources(); self.refresh_alerts(); self.refresh_analytics(); self.refresh_audit()
         tk.Button(win,text="Save Status",command=save,bg="#0b4f8a",fg="white",bd=0,padx=20,pady=8).pack()
     def add_resource(self):
         win=tk.Toplevel(self); win.title("Add Resource"); win.geometry("430x390"); win.configure(bg="white"); fields=[]
@@ -127,7 +179,7 @@ class SmartCampusApp(tk.Tk):
         def save():
             rows=read_csv("resources.csv",RESOURCE_HEADERS); nums=[int(r.get("resource_id","")[1:]) for r in rows if r.get("resource_id","").startswith("R") and r.get("resource_id","")[1:].isdigit()]; rid=f"R{max(nums,default=0)+1:03d}"; name,cat,loc=[e.get().strip() for e in fields]
             if not name or not loc:messagebox.showwarning("Required","Enter resource name and location.",parent=win);return
-            append_csv("resources.csv",RESOURCE_HEADERS,{"resource_id":rid,"name":name,"category":cat or "Other","location":loc,"status":"Available","last_maintenance":"","next_maintenance":""}); win.destroy(); self.refresh_resources(); self.refresh_analytics()
+            append_csv("resources.csv",RESOURCE_HEADERS,{"resource_id":rid,"name":name,"category":cat or "Other","location":loc,"status":"Available","last_maintenance":"","next_maintenance":""}); self.audit("RESOURCE_CREATED",rid); win.destroy(); self.refresh_resources(); self.refresh_analytics(); self.refresh_audit()
         tk.Button(win,text="Save Resource",command=save,bg="#0b4f8a",fg="white",bd=0,padx=20,pady=9).pack(pady=25)
     def update_maintenance(self):
         item=self.resource_tree.selection()
@@ -146,7 +198,7 @@ class SmartCampusApp(tk.Tk):
             if lv and nv and nv<lv:messagebox.showerror("Invalid Schedule","Next maintenance cannot be earlier than last maintenance.",parent=win);return
             for x in rows:
                 if x.get("resource_id")==rid:x["last_maintenance"]=lv;x["next_maintenance"]=nv
-            rewrite_csv("resources.csv",RESOURCE_HEADERS,rows);win.destroy();self.refresh_resources();self.refresh_alerts()
+            rewrite_csv("resources.csv",RESOURCE_HEADERS,rows);self.audit("MAINTENANCE_UPDATED",rid);win.destroy();self.refresh_resources();self.refresh_alerts();self.refresh_audit()
         tk.Button(win,text="Save Schedule",command=save,bg="#0b4f8a",fg="white",bd=0,padx=20,pady=9).pack(pady=22)
     def build_complaints(self):
         bar=tk.Frame(self.complaint_tab);bar.pack(fill="x",padx=15,pady=12);tk.Button(bar,text="+ New Complaint",command=self.add_complaint,bg="#0b4f8a",fg="white",bd=0,padx=15,pady=8).pack(side="left");tk.Button(bar,text="Refresh",command=self.refresh_complaints,padx=15,pady=7).pack(side="left",padx=8)
@@ -166,7 +218,7 @@ class SmartCampusApp(tk.Tk):
         if not current:return
         win=tk.Toplevel(self);win.title("Update Complaint");win.geometry("430x300");tk.Label(win,text=f"{cid} - {current['title']}",font=("Segoe UI",11,"bold")).pack(pady=18);status=tk.StringVar(value=current.get("status","Pending"));ttk.Combobox(win,textvariable=status,values=STATUSES,state="readonly").pack(fill="x",padx=30,pady=8);tk.Label(win,text="Assigned To").pack(anchor="w",padx=30);assigned=tk.Entry(win);assigned.insert(0,current.get("assigned_to",""));assigned.pack(fill="x",padx=30,ipady=6)
         def save():
-            current["status"]=status.get();current["assigned_to"]=assigned.get().strip();rewrite_csv("complaints.csv",COMPLAINT_HEADERS,rows);win.destroy();self.refresh_complaints();self.refresh_alerts();self.refresh_analytics()
+            current["status"]=status.get();current["assigned_to"]=assigned.get().strip();rewrite_csv("complaints.csv",COMPLAINT_HEADERS,rows);self.audit("COMPLAINT_UPDATED",cid);win.destroy();self.refresh_complaints();self.refresh_alerts();self.refresh_analytics();self.refresh_audit()
         tk.Button(win,text="Save Changes",command=save,bg="#0b4f8a",fg="white",bd=0,padx=20,pady=8).pack(pady=20)
     def add_complaint(self):
         resources=read_csv("resources.csv",RESOURCE_HEADERS)
@@ -178,7 +230,7 @@ class SmartCampusApp(tk.Tk):
         def save():
             selected=rm.get()
             if not title.get().strip() or not desc.get().strip() or not selected:messagebox.showwarning("Required","Complete all fields.",parent=win);return
-            rows=read_csv("complaints.csv",COMPLAINT_HEADERS);nums=[int(r.get("complaint_id","")[1:]) for r in rows if r.get("complaint_id","").startswith("C") and r.get("complaint_id","")[1:].isdigit()];cid=f"C{max(nums,default=0)+1:03d}";rid=selected.split(" - ",1)[0];append_csv("complaints.csv",COMPLAINT_HEADERS,{"complaint_id":cid,"resource_id":rid,"title":title.get().strip(),"description":desc.get().strip(),"category":cm.get(),"priority":pm.get(),"reported_by":self.user.name,"status":"Pending","assigned_to":""});win.destroy();self.refresh_complaints();self.refresh_alerts();self.refresh_analytics()
+            rows=read_csv("complaints.csv",COMPLAINT_HEADERS);nums=[int(r.get("complaint_id","")[1:]) for r in rows if r.get("complaint_id","").startswith("C") and r.get("complaint_id","")[1:].isdigit()];cid=f"C{max(nums,default=0)+1:03d}";rid=selected.split(" - ",1)[0];append_csv("complaints.csv",COMPLAINT_HEADERS,{"complaint_id":cid,"resource_id":rid,"title":title.get().strip(),"description":desc.get().strip(),"category":cm.get(),"priority":pm.get(),"reported_by":self.user.name,"status":"Pending","assigned_to":""});self.audit("COMPLAINT_CREATED",cid);win.destroy();self.refresh_complaints();self.refresh_alerts();self.refresh_analytics();self.refresh_audit()
         tk.Button(win,text="Register Complaint",command=save,bg="#0b4f8a",fg="white",bd=0,padx=20,pady=9).pack(pady=25)
     def build_usage(self):
         bar=tk.Frame(self.usage_tab);bar.pack(fill="x",padx=15,pady=12);tk.Button(bar,text="+ Record Usage",command=self.add_usage,bg="#0b4f8a",fg="white",bd=0,padx=15,pady=8).pack(side="left");tk.Button(bar,text="Refresh",command=self.refresh_usage,padx=15,pady=7).pack(side="left",padx=8);tk.Button(bar,text="Release Resource",command=self.release_resource,bg="#376a92",fg="white",bd=0,padx=12,pady=7).pack(side="left",padx=5);self.usage_tree=self.tree(self.usage_tab,("usage_id","resource_id","used_by","purpose","date","duration"));self.refresh_usage()
@@ -193,7 +245,7 @@ class SmartCampusApp(tk.Tk):
         rid=self.usage_tree.item(item[0],"values")[1];rows=read_csv("resources.csv",RESOURCE_HEADERS)
         for r in rows:
             if r.get("resource_id")==rid and r.get("status")=="In Use":r["status"]="Available"
-        rewrite_csv("resources.csv",RESOURCE_HEADERS,rows);self.refresh_resources();self.refresh_alerts();self.refresh_analytics();messagebox.showinfo("Resource Released",f"{rid} is now Available.")
+        rewrite_csv("resources.csv",RESOURCE_HEADERS,rows);self.audit("RESOURCE_RELEASED",rid);self.refresh_resources();self.refresh_alerts();self.refresh_analytics();self.refresh_audit();messagebox.showinfo("Resource Released",f"{rid} is now Available.")
     def build_reports(self):
         bar=tk.Frame(self.report_tab);bar.pack(fill="x",padx=15,pady=12);tk.Button(bar,text="Refresh Summary",command=self.refresh_report_summary,bg="#0b4f8a",fg="white",bd=0,padx=15,pady=8).pack(side="left");tk.Button(bar,text="Export CSV Reports",command=self.export_reports,padx=15,pady=7).pack(side="left",padx=8);self.report_text=tk.Text(self.report_tab,font=("Consolas",11),bg="white",fg="#12395b",bd=0,padx=20,pady=20);self.report_text.pack(fill="both",expand=True,padx=15,pady=10);self.refresh_report_summary()
     def refresh_report_summary(self):
@@ -222,7 +274,7 @@ class SmartCampusApp(tk.Tk):
             append_csv("usage.csv",USAGE_HEADERS,{"usage_id":uid,"resource_id":rid,"used_by":self.user.name,"purpose":purpose.get().strip(),"date":datetime.now().strftime("%Y-%m-%d"),"duration":duration.get().strip()})
             for r in resources:
                 if r.get("resource_id")==rid:r["status"]="In Use"
-            rewrite_csv("resources.csv",RESOURCE_HEADERS,resources);win.destroy();self.refresh_usage();self.refresh_resources();self.refresh_analytics();self.refresh_alerts()
+            rewrite_csv("resources.csv",RESOURCE_HEADERS,resources);self.audit("USAGE_RECORDED",uid);win.destroy();self.refresh_usage();self.refresh_resources();self.refresh_analytics();self.refresh_alerts();self.refresh_audit()
         tk.Button(win,text="Save Usage",command=save,bg="#0b4f8a",fg="white",bd=0,padx=20,pady=9).pack(pady=25)
 
 if __name__=="__main__":SmartCampusApp().mainloop()
