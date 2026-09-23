@@ -82,7 +82,10 @@ class SmartCampusApp(tk.Tk):
         notebook=ttk.Notebook(body); notebook.pack(fill="both",expand=True,pady=(18,0))
         self.resource_tab=ttk.Frame(notebook); self.complaint_tab=ttk.Frame(notebook); self.usage_tab=ttk.Frame(notebook); self.report_tab=ttk.Frame(notebook)
         notebook.add(self.resource_tab,text="  Resources  "); notebook.add(self.complaint_tab,text="  Complaints  "); notebook.add(self.usage_tab,text="  Usage  "); notebook.add(self.report_tab,text="  Reports  ")
+        if self.user.role == "Admin":
+            self.user_tab=ttk.Frame(notebook); notebook.add(self.user_tab,text="  Users  ")
         self.build_resources(); self.build_complaints(); self.build_usage(); self.build_reports()
+        if self.user.role == "Admin": self.build_users()
 
     def build_cards(self,parent):
         self.card_vars={}
@@ -109,11 +112,44 @@ class SmartCampusApp(tk.Tk):
         t.pack(fill="both",expand=True,padx=15,pady=10)
         return t
 
+
+    def build_users(self):
+        bar=tk.Frame(self.user_tab); bar.pack(fill="x",padx=15,pady=12)
+        tk.Button(bar,text="+ Add User",command=self.add_user,bg="#0b4f8a",fg="white",bd=0,padx=15,pady=8).pack(side="left")
+        tk.Button(bar,text="Refresh",command=self.refresh_users,padx=15,pady=7).pack(side="left",padx=8)
+        self.user_tree=self.tree(self.user_tab,("username","role","name"))
+        self.refresh_users()
+
+    def refresh_users(self):
+        for x in self.user_tree.get_children(): self.user_tree.delete(x)
+        for u in read_csv("users.csv",USER_HEADERS):
+            self.user_tree.insert("", "end", values=(u["username"],u["role"],u["name"]))
+
+    def add_user(self):
+        win=tk.Toplevel(self); win.title("Add Campus User"); win.geometry("430x390"); win.configure(bg="white")
+        fields={}
+        for label,key in (("Username","username"),("Password","password"),("Display Name","name")):
+            tk.Label(win,text=label,bg="white",fg="#345",font=("Segoe UI",10,"bold")).pack(anchor="w",padx=30,pady=(16,3))
+            e=tk.Entry(win,font=("Segoe UI",11),show="*" if key=="password" else "")
+            e.pack(fill="x",padx=30,ipady=7); fields[key]=e
+        tk.Label(win,text="Role",bg="white",fg="#345",font=("Segoe UI",10,"bold")).pack(anchor="w",padx=30,pady=(16,3))
+        role=tk.StringVar(value="Faculty")
+        ttk.Combobox(win,textvariable=role,values=("Admin","Faculty"),state="readonly").pack(fill="x",padx=30)
+        def save():
+            rows=read_csv("users.csv",USER_HEADERS)
+            vals={k:e.get().strip() for k,e in fields.items()}
+            if not all(vals.values()): messagebox.showwarning("Required","Complete all fields.",parent=win); return
+            if any(x["username"].lower()==vals["username"].lower() for x in rows):
+                messagebox.showerror("Duplicate","Username already exists.",parent=win); return
+            vals["role"]=role.get(); append_csv("users.csv",USER_HEADERS,vals)
+            win.destroy(); self.refresh_users()
+        tk.Button(win,text="Create User",command=save,bg="#0b4f8a",fg="white",bd=0,padx=20,pady=9).pack(pady=25)
+
     def build_resources(self):
         bar=tk.Frame(self.resource_tab); bar.pack(fill="x",padx=15,pady=12)
-        tk.Button(bar,text="+ Add Resource",command=self.add_resource,bg="#0b4f8a",fg="white",bd=0,padx=15,pady=8).pack(side="left")
+        tk.Button(bar,text="+ Add Resource",command=self.add_resource,bg="#0b4f8a",fg="white",bd=0,padx=15,pady=8).pack(side="left") if self.user.role=="Admin" else None
         tk.Button(bar,text="Refresh",command=self.refresh_resources,padx=15,pady=7).pack(side="left",padx=8)
-        tk.Button(bar,text="Update Status",command=self.update_resource_status,bg="#376a92",fg="white",bd=0,padx=12,pady=7).pack(side="left",padx=5)
+        tk.Button(bar,text="Update Status",command=self.update_resource_status,bg="#376a92",fg="white",bd=0,padx=12,pady=7).pack(side="left",padx=5) if self.user.role=="Admin" else None
         tk.Label(bar,text="Search:",font=("Segoe UI",10,"bold")).pack(side="left",padx=(12,4))
         self.resource_search=tk.StringVar(); tk.Entry(bar,textvariable=self.resource_search,width=22).pack(side="left",ipady=5); self.resource_search.trace_add("write",lambda *a:self.refresh_resources())
         self.resource_tree=self.tree(self.resource_tab,("resource_id","name","category","location","status"))
@@ -159,7 +195,7 @@ class SmartCampusApp(tk.Tk):
         bar=tk.Frame(self.complaint_tab); bar.pack(fill="x",padx=15,pady=12)
         tk.Button(bar,text="+ New Complaint",command=self.add_complaint,bg="#0b4f8a",fg="white",bd=0,padx=15,pady=8).pack(side="left")
         tk.Button(bar,text="Refresh",command=self.refresh_complaints,padx=15,pady=7).pack(side="left",padx=8)
-        tk.Button(bar,text="Update Selected",command=self.update_complaint,bg="#376a92",fg="white",bd=0,padx=12,pady=7).pack(side="left",padx=5)
+        tk.Button(bar,text="Update Selected",command=self.update_complaint,bg="#376a92",fg="white",bd=0,padx=12,pady=7).pack(side="left",padx=5) if self.user.role in ("Admin","Faculty") else None
         tk.Label(bar,text="Search:",font=("Segoe UI",10,"bold")).pack(side="left",padx=(12,4))
         self.complaint_search=tk.StringVar(); tk.Entry(bar,textvariable=self.complaint_search,width=22).pack(side="left",ipady=5); self.complaint_search.trace_add("write",lambda *a:self.refresh_complaints())
         self.complaint_tree=self.tree(self.complaint_tab,("complaint_id","resource_id","title","category","priority","status","reported_by"))
@@ -217,6 +253,7 @@ class SmartCampusApp(tk.Tk):
         bar=tk.Frame(self.usage_tab); bar.pack(fill="x",padx=15,pady=12)
         tk.Button(bar,text="+ Record Usage",command=self.add_usage,bg="#0b4f8a",fg="white",bd=0,padx=15,pady=8).pack(side="left")
         tk.Button(bar,text="Refresh",command=self.refresh_usage,padx=15,pady=7).pack(side="left",padx=8)
+        tk.Button(bar,text="Release Resource",command=self.release_resource,bg="#376a92",fg="white",bd=0,padx=12,pady=7).pack(side="left",padx=5)
         self.usage_tree=self.tree(self.usage_tab,("usage_id","resource_id","used_by","purpose","date","duration"))
         self.refresh_usage()
 
@@ -225,6 +262,19 @@ class SmartCampusApp(tk.Tk):
         for x in self.usage_tree.get_children(): self.usage_tree.delete(x)
         for u in read_csv("usage.csv",USAGE_HEADERS): self.usage_tree.insert("", "end", values=tuple(u[k] for k in USAGE_HEADERS))
         self.refresh_cards()
+
+
+    def release_resource(self):
+        item=self.usage_tree.selection()
+        if not item:
+            messagebox.showwarning("Select Usage","Select a usage record first."); return
+        rid=self.usage_tree.item(item[0],"values")[1]
+        rows=read_csv("resources.csv",RESOURCE_HEADERS)
+        for r in rows:
+            if r["resource_id"]==rid and r["status"]=="In Use": r["status"]="Available"
+        rewrite_csv("resources.csv",RESOURCE_HEADERS,rows)
+        self.refresh_resources()
+        messagebox.showinfo("Resource Released",f"{rid} is now Available.")
 
     def build_reports(self):
         bar=tk.Frame(self.report_tab); bar.pack(fill="x",padx=15,pady=12)
@@ -240,6 +290,11 @@ class SmartCampusApp(tk.Tk):
         for st in STATUSES:lines.append(f"{st}: {sum(c['status']==st for c in complaints)}")
         for p in PRIORITIES:lines.append(f"{p} priority: {sum(c['priority']==p for c in complaints)}")
         lines += ["",f"Usage Records: {len(usage)}"]
+        if resources:
+            lines += ["", "Resource Utilization:"]
+            for r in resources:
+                count=sum(u["resource_id"]==r["resource_id"] for u in usage)
+                lines.append(f"  {r['resource_id']} - {r['name']}: {count} usage record(s)")
         self.report_text.delete("1.0","end"); self.report_text.insert("1.0","\n".join(lines))
 
     def export_reports(self):
