@@ -17,6 +17,7 @@ STATUSES=("Pending","Assigned","In Progress","Resolved","Closed")
 RESOURCE_STATUSES=("Available","In Use","Maintenance","Out of Service")
 DATA_FILES=("users.csv","resources.csv","complaints.csv","usage.csv")
 AUDIT_HEADERS=("timestamp","username","role","action","details")
+NOTIFICATION_HEADERS=("timestamp","username","type","title","message","read")
 
 class SmartCampusApp(tk.Tk):
     def __init__(self):
@@ -25,7 +26,43 @@ class SmartCampusApp(tk.Tk):
         try:self.style.theme_use("clam")
         except tk.TclError:pass
         self.style.configure("Treeview",rowheight=30,font=("Segoe UI",10)); self.style.configure("Treeview.Heading",font=("Segoe UI",10,"bold")); self.style.configure("TNotebook.Tab",padding=(18,10),font=("Segoe UI",10,"bold")); self.show_login()
-    def audit(self,action,details=""):
+    def notify(self,kind,title,message):
+        append_csv("notifications.csv",NOTIFICATION_HEADERS,{"timestamp":datetime.now().strftime("%Y-%m-%d %H:%M:%S"),"username":self.user.username if self.user else "SYSTEM","type":kind,"title":title,"message":message,"read":"No"})
+    def refresh_notifications(self):
+        if not hasattr(self,"notification_tree"): return
+        for x in self.notification_tree.get_children(): self.notification_tree.delete(x)
+        rows=read_csv("notifications.csv",NOTIFICATION_HEADERS)
+        for row in reversed(rows):
+            if row.get("username") in (self.user.username,"SYSTEM"):
+                self.notification_tree.insert("","end",values=tuple(row.get(k,"") for k in NOTIFICATION_HEADERS))
+        unread=sum(1 for r in rows if r.get("username") in (self.user.username,"SYSTEM") and r.get("read")!="Yes")
+        if hasattr(self,"notification_count"): self.notification_count.set(str(unread))
+    def mark_notifications_read(self):
+        rows=read_csv("notifications.csv",NOTIFICATION_HEADERS)
+        for r in rows:
+            if r.get("username") in (self.user.username,"SYSTEM"): r["read"]="Yes"
+        rewrite_csv("notifications.csv",NOTIFICATION_HEADERS,rows); self.refresh_notifications()
+    def generate_notifications(self):
+        resources=read_csv("resources.csv",RESOURCE_HEADERS); complaints=read_csv("complaints.csv",COMPLAINT_HEADERS)
+        today=datetime.now().date()
+        existing=read_csv("notifications.csv",NOTIFICATION_HEADERS)
+        existing_keys={(r.get("type"),r.get("message"),r.get("username")) for r in existing}
+        def add(kind,title,msg):
+            key=(kind,msg,self.user.username)
+            if key not in existing_keys:
+                self.notify(kind,title,msg); existing_keys.add(key)
+        for r in resources:
+            nxt=r.get("next_maintenance","").strip()
+            if r.get("status")=="Out of Service": add("RESOURCE","Resource Out of Service",f"{r.get('resource_id','')} - {r.get('name','')} is out of service.")
+            if nxt:
+                try:
+                    days=(datetime.strptime(nxt,"%Y-%m-%d").date()-today).days
+                    if days<0: add("MAINTENANCE","Overdue Maintenance",f"{r.get('resource_id','')} maintenance is overdue.")
+                    elif days<=7: add("MAINTENANCE","Upcoming Maintenance",f"{r.get('resource_id','')} maintenance is due in {days} day(s).")
+                except ValueError: add("MAINTENANCE","Invalid Maintenance Date",f"{r.get('resource_id','')} has an invalid maintenance date.")
+        for x in complaints:
+            if x.get("priority") in ("High","Critical") and x.get("status") not in ("Resolved","Closed"):
+                add("COMPLAINT","Priority Complaint",f"{x.get('complaint_id','')} is {x.get('priority','')} priority and unresolved.")
         append_csv("audit.csv",AUDIT_HEADERS,{"timestamp":datetime.now().strftime("%Y-%m-%d %H:%M:%S"),"username":self.user.username if self.user else "SYSTEM","role":self.user.role if self.user else "SYSTEM","action":action,"details":details})
 
     def backup_data(self):
@@ -112,16 +149,26 @@ class SmartCampusApp(tk.Tk):
             win.destroy(); self.show_dashboard()
         tk.Button(win,text="Save Profile",command=save,bg="#0b4f8a",fg="white",bd=0,padx=20,pady=9).pack()
 
+    def build_notifications(self,parent):
+        bar=tk.Frame(parent,bg="#eef4fb"); bar.pack(fill="x",padx=15,pady=12)
+        self.notification_count=tk.StringVar(value="0")
+        tk.Button(bar,text="Refresh Notifications",command=lambda:(self.generate_notifications(),self.refresh_notifications()),bg="#0b4f8a",fg="white",bd=0,padx=14,pady=8).pack(side="left")
+        tk.Button(bar,text="Mark All as Read",command=self.mark_notifications_read,bg="#376a92",fg="white",bd=0,padx=14,pady=8).pack(side="left",padx=8)
+        tk.Label(bar,text="Unread:",bg="#eef4fb",fg="#456",font=("Segoe UI",10,"bold")).pack(side="left",padx=(15,5))
+        tk.Label(bar,textvariable=self.notification_count,bg="#eef4fb",fg="#c0392b",font=("Segoe UI",12,"bold")).pack(side="left")
+        self.notification_tree=self.tree(parent,NOTIFICATION_HEADERS)
+        self.generate_notifications(); self.refresh_notifications()
+
     def show_dashboard(self):
         self.clear(); top=tk.Frame(self,bg="#0b4f8a",height=76); top.pack(fill="x"); tk.Label(top,text="Smart Campus Utility Management",font=("Segoe UI",20,"bold"),fg="white",bg="#0b4f8a").pack(side="left",padx=25,pady=18); tk.Label(top,text=f"{self.user.name}  •  {self.user.role}  •  Login: {self.session_started.strftime("%H:%M") if self.session_started else ""}",font=("Segoe UI",10),fg="white",bg="#0b4f8a").pack(side="right",padx=15); tk.Button(top,text="Logout",command=self.confirm_logout,bg="#083b68",fg="white",bd=0,padx=15,pady=8).pack(side="right"); tk.Button(top,text="My Profile",command=self.user_profile,bg="#376a92",fg="white",bd=0,padx=15,pady=8).pack(side="right",padx=5)
         body=tk.Frame(self,bg="#eef4fb"); body.pack(fill="both",expand=True,padx=20,pady=20); self.build_cards(body); notebook=ttk.Notebook(body); notebook.pack(fill="both",expand=True,pady=(18,0))
-        self.home_tab=ttk.Frame(notebook); self.resource_tab=ttk.Frame(notebook); self.complaint_tab=ttk.Frame(notebook); self.usage_tab=ttk.Frame(notebook); self.report_tab=ttk.Frame(notebook); self.analytics_tab=ttk.Frame(notebook); self.alert_tab=ttk.Frame(notebook); self.audit_tab=ttk.Frame(notebook)
-        for tab,text in ((self.home_tab,"Dashboard"),(self.resource_tab,"Resources"),(self.complaint_tab,"Complaints"),(self.usage_tab,"Usage"),(self.report_tab,"Reports"),(self.analytics_tab,"Analytics"),(self.alert_tab,"Alerts"),(self.audit_tab,"Audit")):notebook.add(tab,text=f"  {text}  ")
+        self.home_tab=ttk.Frame(notebook); self.notification_tab=ttk.Frame(notebook); self.resource_tab=ttk.Frame(notebook); self.complaint_tab=ttk.Frame(notebook); self.usage_tab=ttk.Frame(notebook); self.report_tab=ttk.Frame(notebook); self.analytics_tab=ttk.Frame(notebook); self.alert_tab=ttk.Frame(notebook); self.audit_tab=ttk.Frame(notebook)
+        for tab,text in ((self.home_tab,"Dashboard"),(self.notification_tab,"Notifications"),(self.resource_tab,"Resources"),(self.complaint_tab,"Complaints"),(self.usage_tab,"Usage"),(self.report_tab,"Reports"),(self.analytics_tab,"Analytics"),(self.alert_tab,"Alerts"),(self.audit_tab,"Audit")):notebook.add(tab,text=f"  {text}  ")
         if self.user.role=="Admin":
             self.user_tab=ttk.Frame(notebook); notebook.add(self.user_tab,text="  Users  ")
             self.admin_tab=ttk.Frame(notebook); notebook.add(self.admin_tab,text="  Admin Center  ")
             self.build_backup_controls(); self.build_admin_center()
-        self.build_professional_dashboard(self.home_tab); self.build_resources(); self.build_complaints(); self.build_usage(); self.build_reports(); self.build_analytics(); self.build_alerts(); self.build_audit()
+        self.build_professional_dashboard(self.home_tab); self.build_notifications(self.notification_tab); self.build_resources(); self.build_complaints(); self.build_usage(); self.build_reports(); self.build_analytics(); self.build_alerts(); self.build_audit()
         if self.user.role=="Admin":self.build_users()
     def build_professional_dashboard(self,parent):
         frame=tk.Frame(parent,bg="#eef4fb"); frame.pack(fill="both",expand=True)
