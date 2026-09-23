@@ -4,7 +4,7 @@ from datetime import datetime
 from models import User
 from storage import read_csv, append_csv, rewrite_csv
 
-RESOURCE_HEADERS = ["resource_id","name","category","location","status"]
+RESOURCE_HEADERS = ["resource_id","name","category","location","status","last_maintenance","next_maintenance"]
 COMPLAINT_HEADERS = ["complaint_id","resource_id","title","description","category","priority","reported_by","status","assigned_to"]
 USAGE_HEADERS = ["usage_id","resource_id","used_by","purpose","date","duration"]
 USER_HEADERS = ["username","password","role","name"]
@@ -172,9 +172,10 @@ class SmartCampusApp(tk.Tk):
         tk.Button(bar,text="+ Add Resource",command=self.add_resource,bg="#0b4f8a",fg="white",bd=0,padx=15,pady=8).pack(side="left") if self.user.role=="Admin" else None
         tk.Button(bar,text="Refresh",command=self.refresh_resources,padx=15,pady=7).pack(side="left",padx=8)
         tk.Button(bar,text="Update Status",command=self.update_resource_status,bg="#376a92",fg="white",bd=0,padx=12,pady=7).pack(side="left",padx=5) if self.user.role=="Admin" else None
+        tk.Button(bar,text="Maintenance",command=self.update_maintenance,bg="#376a92",fg="white",bd=0,padx=12,pady=7).pack(side="left",padx=5) if self.user.role=="Admin" else None
         tk.Label(bar,text="Search:",font=("Segoe UI",10,"bold")).pack(side="left",padx=(12,4))
         self.resource_search=tk.StringVar(); tk.Entry(bar,textvariable=self.resource_search,width=22).pack(side="left",ipady=5); self.resource_search.trace_add("write",lambda *a:self.refresh_resources())
-        self.resource_tree=self.tree(self.resource_tab,("resource_id","name","category","location","status"))
+        self.resource_tree=self.tree(self.resource_tab,("resource_id","name","category","location","status","last_maintenance","next_maintenance"))
         self.refresh_resources()
 
     def refresh_resources(self):
@@ -182,7 +183,7 @@ class SmartCampusApp(tk.Tk):
         for x in self.resource_tree.get_children(): self.resource_tree.delete(x)
         term=getattr(self,"resource_search",tk.StringVar()).get().lower().strip()
         for r in read_csv("resources.csv",RESOURCE_HEADERS):
-            if not term or term in " ".join(r.values()).lower(): self.resource_tree.insert("", "end", values=tuple(r[c] for c in RESOURCE_HEADERS))
+            if not term or term in " ".join(r.values()).lower(): self.resource_tree.insert("", "end", values=tuple(r.get(k,"") for k in RESOURCE_HEADERS))
         self.refresh_cards()
 
     def update_resource_status(self):
@@ -209,9 +210,32 @@ class SmartCampusApp(tk.Tk):
             rid=f"R{max(nums,default=0)+1:03d}"
             name,cat,loc=[e.get().strip() for e in fields]
             if not name or not loc: messagebox.showwarning("Required","Enter resource name and location.",parent=win); return
-            append_csv("resources.csv",RESOURCE_HEADERS,{"resource_id":rid,"name":name,"category":cat or "Other","location":loc,"status":"Available"})
+            append_csv("resources.csv",RESOURCE_HEADERS,{"resource_id":rid,"name":name,"category":cat or "Other","location":loc,"status":"Available","last_maintenance":"","next_maintenance":""})
             win.destroy(); self.refresh_resources()
         tk.Button(win,text="Save Resource",command=save,bg="#0b4f8a",fg="white",bd=0,padx=20,pady=9).pack(pady=25)
+
+    def update_maintenance(self):
+        item=self.resource_tree.selection()
+        if not item:
+            messagebox.showwarning("Select Resource","Select a resource first."); return
+        rid=self.resource_tree.item(item[0],"values")[0]
+        rows=read_csv("resources.csv",RESOURCE_HEADERS)
+        current=next((x for x in rows if x["resource_id"]==rid),None)
+        if not current: return
+        win=tk.Toplevel(self); win.title("Maintenance Schedule"); win.geometry("420x300"); win.configure(bg="white")
+        tk.Label(win,text=f"Maintenance: {rid}",font=("Segoe UI",13,"bold"),bg="white",fg="#12395b").pack(pady=18)
+        tk.Label(win,text="Last Maintenance (YYYY-MM-DD)",bg="white").pack(anchor="w",padx=30,pady=(8,3))
+        last=tk.Entry(win); last.insert(0,current.get("last_maintenance","")); last.pack(fill="x",padx=30,ipady=6)
+        tk.Label(win,text="Next Maintenance (YYYY-MM-DD)",bg="white").pack(anchor="w",padx=30,pady=(14,3))
+        nxt=tk.Entry(win); nxt.insert(0,current.get("next_maintenance","")); nxt.pack(fill="x",padx=30,ipady=6)
+        def save():
+            for x in rows:
+                if x["resource_id"]==rid:
+                    x["last_maintenance"]=last.get().strip()
+                    x["next_maintenance"]=nxt.get().strip()
+            rewrite_csv("resources.csv",RESOURCE_HEADERS,rows)
+            win.destroy(); self.refresh_resources()
+        tk.Button(win,text="Save Schedule",command=save,bg="#0b4f8a",fg="white",bd=0,padx=20,pady=9).pack(pady=22)
 
     def build_complaints(self):
         bar=tk.Frame(self.complaint_tab); bar.pack(fill="x",padx=15,pady=12)
@@ -312,6 +336,8 @@ class SmartCampusApp(tk.Tk):
         for st in STATUSES:lines.append(f"{st}: {sum(c['status']==st for c in complaints)}")
         for p in PRIORITIES:lines.append(f"{p} priority: {sum(c['priority']==p for c in complaints)}")
         lines += ["",f"Usage Records: {len(usage)}"]
+        scheduled=sum(1 for r in resources if r.get("next_maintenance","").strip())
+        lines.append(f"Maintenance schedules recorded: {scheduled}")
         if resources:
             lines += ["", "Resource Utilization:"]
             for r in resources:
