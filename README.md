@@ -159,3 +159,19 @@ Version 23 adds:
 - Maintenance calendar
 - Maintenance workload visibility
 - Cost analytics integrated with maintenance history
+
+
+## Version 24 — Smart Maintenance Automation & Predictive Failure Detection
+
+Version 24 adds:
+- Predictive maintenance risk analysis
+- Resource failure-risk classification
+- Failure-frequency tracking over the previous year
+- Maintenance-frequency analysis
+- Average maintenance cost per resource
+- Overdue maintenance impact analysis
+- Smart maintenance recommendations
+- Predictive maintenance alerts and notification integration
+- Predictive risk analysis dashboard
+- Automated health/risk refresh
+- Maintenance recommendation workflow
