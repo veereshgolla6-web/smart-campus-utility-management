@@ -126,3 +126,20 @@ Version 21 adds:
 - Operating-hours based utilization calculation
 - Overbooking prevention through reservation conflict validation
 - Dedicated Smart Scheduling dashboard
+
+
+## Version 22 — Predictive Maintenance & Resource Health Intelligence
+
+Version 22 adds:
+- Resource health score out of 100
+- Low/Medium/High health-risk classification
+- Maintenance history records
+- Preventive, corrective, inspection and emergency maintenance types
+- Maintenance cost tracking
+- Maintenance history and total-cost view
+- Failure-risk indicators using condition, complaints, maintenance frequency and overdue maintenance
+- Maintenance workload/health alerts
+- Preventive-maintenance recommendations through health-risk analysis
+- Maintenance records update resource maintenance dates and status
+- Maintenance data included in backup and restore
+- New data file: `data/maintenance.csv`
