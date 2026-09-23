@@ -175,3 +175,19 @@ Version 24 adds:
 - Predictive risk analysis dashboard
 - Automated health/risk refresh
 - Maintenance recommendation workflow
+
+
+## Version 25 — AI-Based Resource Optimization & Intelligent Campus Planning
+
+Version 25 adds:
+- AI-style resource demand analysis
+- 30-day resource utilization analysis
+- Usage + reservation demand measurement
+- Department-wise demand analysis
+- Category-wise demand analysis
+- Under-utilized resource detection
+- High-demand resource detection
+- Smart allocation and sharing recommendations
+- Capacity optimization guidance
+- Campus resource efficiency score
+- Dedicated AI Resource Optimization dashboard
