@@ -163,13 +163,13 @@ class SmartCampusApp(tk.Tk):
     def show_dashboard(self):
         self.clear(); top=tk.Frame(self,bg="#0b4f8a",height=76); top.pack(fill="x"); tk.Label(top,text="Smart Campus Utility Management",font=("Segoe UI",20,"bold"),fg="white",bg="#0b4f8a").pack(side="left",padx=25,pady=18); tk.Label(top,text=f"{self.user.name}  •  {self.user.role}  •  Login: {self.session_started.strftime("%H:%M") if self.session_started else ""}",font=("Segoe UI",10),fg="white",bg="#0b4f8a").pack(side="right",padx=15); tk.Button(top,text="Logout",command=self.confirm_logout,bg="#083b68",fg="white",bd=0,padx=15,pady=8).pack(side="right"); tk.Button(top,text="My Profile",command=self.user_profile,bg="#376a92",fg="white",bd=0,padx=15,pady=8).pack(side="right",padx=5)
         body=tk.Frame(self,bg="#eef4fb"); body.pack(fill="both",expand=True,padx=20,pady=20); self.build_cards(body); notebook=ttk.Notebook(body); notebook.pack(fill="both",expand=True,pady=(18,0))
-        self.home_tab=ttk.Frame(notebook); self.notification_tab=ttk.Frame(notebook); self.resource_tab=ttk.Frame(notebook); self.reservation_tab=ttk.Frame(notebook); self.schedule_tab=ttk.Frame(notebook); self.health_tab=ttk.Frame(notebook); self.maintenance_plan_tab=ttk.Frame(notebook); self.complaint_tab=ttk.Frame(notebook); self.usage_tab=ttk.Frame(notebook); self.report_tab=ttk.Frame(notebook); self.analytics_tab=ttk.Frame(notebook); self.alert_tab=ttk.Frame(notebook); self.audit_tab=ttk.Frame(notebook)
-        for tab,text in ((self.home_tab,"Dashboard"),(self.notification_tab,"Notifications"),(self.resource_tab,"Resources"),(self.reservation_tab,"Reservations"),(self.schedule_tab,"Smart Scheduling"),(self.health_tab,"Resource Health"),(self.maintenance_plan_tab,"Maintenance Planning"),(self.complaint_tab,"Complaints"),(self.usage_tab,"Usage"),(self.report_tab,"Reports"),(self.analytics_tab,"Analytics"),(self.alert_tab,"Alerts"),(self.audit_tab,"Audit")):notebook.add(tab,text=f"  {text}  ")
+        self.home_tab=ttk.Frame(notebook); self.notification_tab=ttk.Frame(notebook); self.resource_tab=ttk.Frame(notebook); self.reservation_tab=ttk.Frame(notebook); self.schedule_tab=ttk.Frame(notebook); self.health_tab=ttk.Frame(notebook); self.maintenance_plan_tab=ttk.Frame(notebook); self.prediction_tab=ttk.Frame(notebook); self.complaint_tab=ttk.Frame(notebook); self.usage_tab=ttk.Frame(notebook); self.report_tab=ttk.Frame(notebook); self.analytics_tab=ttk.Frame(notebook); self.alert_tab=ttk.Frame(notebook); self.audit_tab=ttk.Frame(notebook)
+        for tab,text in ((self.home_tab,"Dashboard"),(self.notification_tab,"Notifications"),(self.resource_tab,"Resources"),(self.reservation_tab,"Reservations"),(self.schedule_tab,"Smart Scheduling"),(self.health_tab,"Resource Health"),(self.maintenance_plan_tab,"Maintenance Planning"),(self.prediction_tab,"Predictive Maintenance"),(self.complaint_tab,"Complaints"),(self.usage_tab,"Usage"),(self.report_tab,"Reports"),(self.analytics_tab,"Analytics"),(self.alert_tab,"Alerts"),(self.audit_tab,"Audit")):notebook.add(tab,text=f"  {text}  ")
         if self.user.role=="Admin":
             self.user_tab=ttk.Frame(notebook); notebook.add(self.user_tab,text="  Users  ")
             self.admin_tab=ttk.Frame(notebook); notebook.add(self.admin_tab,text="  Admin Center  ")
             self.build_backup_controls(); self.build_admin_center()
-        self.build_professional_dashboard(self.home_tab); self.build_notifications(self.notification_tab); self.build_resources(); self.build_reservations(); self.build_smart_scheduling(); self.build_resource_health(); self.build_maintenance_planning(); self.build_complaints(); self.build_usage(); self.build_reports(); self.build_analytics(); self.build_alerts(); self.build_audit()
+        self.build_professional_dashboard(self.home_tab); self.build_notifications(self.notification_tab); self.build_resources(); self.build_reservations(); self.build_smart_scheduling(); self.build_resource_health(); self.build_maintenance_planning(); self.build_predictive_maintenance(); self.build_complaints(); self.build_usage(); self.build_reports(); self.build_analytics(); self.build_alerts(); self.build_audit()
         if self.user.role=="Admin":self.build_users()
     def build_professional_dashboard(self,parent):
         frame=tk.Frame(parent,bg="#eef4fb"); frame.pack(fill="both",expand=True)
@@ -911,6 +911,85 @@ class SmartCampusApp(tk.Tk):
         for r in sorted(rows,key=lambda x:x.get("date","")):
             tree.insert("","end",values=(r.get("date",""),r.get("resource_id",""),r.get("type",""),r.get("status",""),r.get("cost",""),r.get("performed_by","")))
         self.audit("MAINTENANCE_CALENDAR_VIEWED",f"{len(rows)} record(s)")
+
+    def predictive_metrics(self,rid):
+        score,reasons=self.resource_health_score(rid)
+        maintenance=read_csv("maintenance.csv",MAINTENANCE_HEADERS); complaints=read_csv("complaints.csv",COMPLAINT_HEADERS)
+        today=datetime.now().date()
+        history=[r for r in maintenance if r.get("resource_id")==rid]
+        recent_cut=today-timedelta(days=365)
+        recent=[r for r in history if self.parse_report_date(r.get("date","")) and self.parse_report_date(r.get("date",""))>=recent_cut]
+        freq=len(recent)
+        costs=[]
+        for r in history:
+            try: costs.append(float(r.get("cost","0") or 0))
+            except ValueError: pass
+        avg_cost=sum(costs)/len(costs) if costs else 0
+        overdue_days=0
+        resources=read_csv("resources.csv",RESOURCE_HEADERS); resource=next((r for r in resources if r.get("resource_id")==rid),{})
+        nxt=resource.get("next_maintenance","").strip()
+        if nxt:
+            try: overdue_days=max(0,(today-datetime.strptime(nxt,"%Y-%m-%d").date()).days)
+            except ValueError: overdue_days=30
+        high=sum(1 for c in complaints if c.get("resource_id")==rid and c.get("priority") in ("High","Critical") and c.get("status") not in ("Resolved","Closed"))
+        risk_score=(100-score)+(freq*4)+(high*8)+(min(30,overdue_days))
+        risk="Critical" if risk_score>=80 else "High" if risk_score>=50 else "Medium" if risk_score>=25 else "Low"
+        if risk in ("Critical","High") or overdue_days>0: recommendation="Schedule preventive maintenance immediately"
+        elif freq>=3: recommendation="Shorten maintenance interval and inspect resource"
+        elif avg_cost>0: recommendation="Continue preventive monitoring and track maintenance cost"
+        else: recommendation="Establish a preventive maintenance baseline"
+        return score,risk,freq,len(history),avg_cost,overdue_days,recommendation
+
+    def build_predictive_maintenance(self):
+        bar=tk.Frame(self.prediction_tab,bg="#eef4fb"); bar.pack(fill="x",padx=15,pady=12)
+        tk.Button(bar,text="Refresh Predictions",command=self.refresh_predictive_maintenance,bg="#0b4f8a",fg="white",bd=0,padx=14,pady=8).pack(side="left")
+        tk.Button(bar,text="Generate Alerts",command=self.generate_predictive_alerts,bg="#8a5a0b",fg="white",bd=0,padx=14,pady=8).pack(side="left",padx=6)
+        tk.Button(bar,text="Risk Analysis",command=self.show_predictive_risk_analysis,bg="#657789",fg="white",bd=0,padx=14,pady=8).pack(side="left",padx=6)
+        tk.Button(bar,text="Maintenance Recommendations",command=self.show_maintenance_recommendations,bg="#376a92",fg="white",bd=0,padx=14,pady=8).pack(side="left",padx=6)
+        self.prediction_tree=self.tree(self.prediction_tab,("resource_id","health_score","risk_level","failure_frequency","maintenance_count","avg_cost","overdue_days","recommendation"))
+        self.refresh_predictive_maintenance()
+
+    def refresh_predictive_maintenance(self):
+        if not hasattr(self,"prediction_tree"): return
+        for x in self.prediction_tree.get_children(): self.prediction_tree.delete(x)
+        for r in read_csv("resources.csv",RESOURCE_HEADERS):
+            m=self.predictive_metrics(r.get("resource_id",""))
+            self.prediction_tree.insert("","end",values=(r.get("resource_id",""),f"{m[0]}/100",m[1],m[2],m[3],f"{m[4]:.2f}",m[5],m[6]))
+
+    def generate_predictive_alerts(self):
+        alerts=0
+        for r in read_csv("resources.csv",RESOURCE_HEADERS):
+            rid=r.get("resource_id",""); m=self.predictive_metrics(rid)
+            if m[1] in ("High","Critical"):
+                self.notify("PREDICTIVE","Predictive Maintenance Risk",f"{rid} has {m[1]} failure risk. Recommendation: {m[6]}")
+                alerts+=1
+        self.audit("PREDICTIVE_ALERTS_GENERATED",f"{alerts} alert(s)")
+        self.refresh_notifications()
+        messagebox.showinfo("Predictive Alerts",f"{alerts} predictive maintenance alert(s) generated.")
+
+    def show_predictive_risk_analysis(self):
+        rows=[]
+        for r in read_csv("resources.csv",RESOURCE_HEADERS):
+            m=self.predictive_metrics(r.get("resource_id",""))
+            rows.append((r.get("resource_id",""),r.get("name",""),m[0],m[1],m[2],m[3],m[4],m[5]))
+        rows.sort(key=lambda x:({"Critical":0,"High":1,"Medium":2,"Low":3}[x[3]],-x[2]))
+        win=tk.Toplevel(self); win.title("Predictive Risk Analysis"); win.geometry("980x520"); win.configure(bg="#eef4fb")
+        tk.Label(win,text="PREDICTIVE FAILURE RISK ANALYSIS",font=("Segoe UI",17,"bold"),fg="#12395b",bg="#eef4fb").pack(pady=15)
+        tree=self.tree(win,("resource_id","name","health","risk","failure_frequency","maintenance_count","avg_cost","overdue_days"))
+        for row in rows: tree.insert("","end",values=(row[0],row[1],f"{row[2]}/100",row[3],row[4],row[5],f"{row[6]:.2f}",row[7]))
+        self.audit("PREDICTIVE_RISK_ANALYSIS","Viewed predictive failure risk analysis")
+
+    def show_maintenance_recommendations(self):
+        win=tk.Toplevel(self); win.title("Smart Maintenance Recommendations"); win.geometry("850x480"); win.configure(bg="white")
+        tk.Label(win,text="SMART MAINTENANCE RECOMMENDATIONS",font=("Segoe UI",16,"bold"),fg="#12395b",bg="white").pack(pady=15)
+        txt=tk.Text(win,font=("Consolas",10),bg="white",fg="#345",bd=0,padx=20,pady=15); txt.pack(fill="both",expand=True,padx=20,pady=10)
+        lines=[]
+        for r in read_csv("resources.csv",RESOURCE_HEADERS):
+            m=self.predictive_metrics(r.get("resource_id",""))
+            if m[1]!="Low" or m[5]>0:
+                lines.append(f"{r.get('resource_id')} - {r.get('name')}: {m[1]} risk | {m[6]}")
+        txt.insert("1.0","No immediate recommendations." if not lines else "\n".join("• "+x for x in lines))
+        self.audit("MAINTENANCE_RECOMMENDATIONS","Generated smart maintenance recommendations")
 
     def build_complaints(self):
         bar=tk.Frame(self.complaint_tab);bar.pack(fill="x",padx=15,pady=12);tk.Button(bar,text="+ New Complaint",command=self.add_complaint,bg="#0b4f8a",fg="white",bd=0,padx=15,pady=8).pack(side="left");tk.Button(bar,text="Refresh",command=self.refresh_complaints,padx=15,pady=7).pack(side="left",padx=8)
