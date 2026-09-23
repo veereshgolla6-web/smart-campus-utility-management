@@ -191,3 +191,18 @@ Version 25 adds:
 - Capacity optimization guidance
 - Campus resource efficiency score
 - Dedicated AI Resource Optimization dashboard
+
+
+## Version 26 — AI Demand Forecasting & Predictive Resource Planning
+
+Version 26 adds:
+- Historical demand analysis from usage and active/pending reservations
+- Monthly demand trend analysis
+- Short-term demand forecasting
+- Peak resource demand analysis
+- Future capacity shortage warnings
+- Resource utilization-based planning recommendations
+- Department/resource demand visibility
+- Procurement and capacity planning guidance
+- Forecast refresh dashboard
+- AI-style campus planning recommendations
