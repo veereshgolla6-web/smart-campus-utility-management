@@ -1,37 +1,15 @@
-# Smart Campus Utility Management System - Version 10
+# Smart Campus Utility Management System - Version 11
 
-A Python/Tkinter-based campus utility management system for campus resources, maintenance, complaints, usage, reports, analytics, alerts, backups, audit history, administration, and user security.
+A Python/Tkinter campus utility management system for resources, maintenance, complaints, usage, reports, analytics, alerts, backups, audit history, administration, and dashboard monitoring.
 
-## Version 10 features
-- Admin Control Center
-- System health/status summary
-- Recent user activity dashboard from the audit trail
-- User password change workflow
-- Current password verification
-- Minimum 6-character new password validation
-- Admin and Faculty password-change access
-- Existing Version 9 backup, restore, and audit features retained
-
-## Version 9 features
-- Admin-only Backup and Restore
-- Timestamped backup sets
-- Restore confirmation
-- Audit Trail
-- Activity logging for important system operations
-
-## Version 8 features
-- Resource usage automatically changes a resource to In Use
-- Only Available resources can be selected for new usage
-- Release Resource returns resources to Available
-- Maintenance date validation
-- Automatic refresh of alerts and analytics
-
-## Version 7 features
-- Alerts dashboard
-- Overdue and upcoming maintenance alerts
-- Invalid maintenance date detection
-- Out-of-service resource alerts
-- High/Critical unresolved complaint alerts
+## Version 11 — Professional Dashboard
+- Dedicated Dashboard tab
+- Six KPI cards: Resources, Available, In Use, Complaints, Open Complaints, Alerts
+- Resource status summary
+- Recent activity panel based on audit history
+- Alert count combining maintenance, unavailable resources, and unresolved high/critical complaints
+- One-click dashboard refresh
+- Existing Admin Center, password management, backup/restore, and audit trail retained
 
 ## Demo accounts
 - Admin: admin / admin123
@@ -44,4 +22,4 @@ A Python/Tkinter-based campus utility management system for campus resources, ma
 Operational data is stored in `data/`. Backups are stored in `backups/`. Audit history is stored in `data/audit.csv`.
 
 ## Python concepts demonstrated
-Decision making, loops, strings, lists, tuples, dictionaries, functions, file handling, exception handling, CSV persistence, dataclasses/OOP, Tkinter GUI, backup/restore, audit logging, user security, and modular design.
+Decision making, loops, strings, lists, tuples, dictionaries, functions, file handling, exception handling, CSV persistence, dataclasses/OOP, Tkinter GUI, backup/restore, audit logging, user security, analytics, and dashboard design.
