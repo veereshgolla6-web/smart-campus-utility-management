@@ -1,0 +1,6 @@
+@echo off
+title Smart Campus Utility Management System
+cd /d "%~dp0"
+where py >nul 2>nul
+if %errorlevel%==0 (py app.py) else (python app.py)
+if errorlevel 1 pause
