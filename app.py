@@ -807,7 +807,7 @@ class SmartCampusApp(tk.Tk):
             except ValueError: messagebox.showwarning("Invalid Cost","Enter a valid numeric maintenance cost.",parent=win); return
             if cost<0: messagebox.showwarning("Invalid Cost","Cost cannot be negative.",parent=win); return
             if nxt and not self.parse_report_date(nxt): messagebox.showwarning("Invalid Date","Next Due must be YYYY-MM-DD.",parent=win); return
-            row={"maintenance_id":self.maintenance_id(),"resource_id":rid,"date":d.strftime("%Y-%m-%d"),"type":mt.get(),"description":fields["description"].get().strip(),"cost":f"{cost:.2f}","performed_by":fields["performed_by"].get().strip(),"next_due":nxt}
+            row={"maintenance_id":self.maintenance_id(),"resource_id":rid,"date":d.strftime("%Y-%m-%d"),"type":mt.get(),"description":fields["description"].get().strip(),"cost":f"{cost:.2f}","performed_by":fields["performed_by"].get().strip(),"next_due":nxt,"status":st.get()}
             append_csv("maintenance.csv",MAINTENANCE_HEADERS,row)
             resources=read_csv("resources.csv",RESOURCE_HEADERS)
             for r in resources:
