@@ -1,6 +1,11 @@
-# Smart Campus Utility Management System - Version 4
+# Smart Campus Utility Management System - Version 5
 
 Version 4 extends the Python/Tkinter application into a more complete campus resource operations system.
+
+## Version 5 features
+- Analytics dashboard with live resource, complaint, and usage metrics
+- Complaint priority and resolution-rate analysis
+- Resource usage analysis
 
 ## Version 4 features
 - Role-aware interface for Admin and Faculty users
