@@ -1340,7 +1340,7 @@ class SmartCampusApp(tk.Tk):
                 self.notify("JARVIS_"+kind,f"JARVIS {level} Alert",msg); keys.add(key); created+=1
         self.audit("JARVIS_AUTOMATION_SCAN",f"{len(actions)} action(s), {created} new notification(s)")
         self.refresh_notifications()
-        self.refresh_automation_center()
+        self.refresh_automation_center(); self.build_autonomous_operations()
         return actions,created
 
     def build_automation_center(self):
@@ -1400,6 +1400,41 @@ class SmartCampusApp(tk.Tk):
         win=tk.Toplevel(self); win.title("JARVIS Workflow Report"); win.geometry("850x580")
         txt=tk.Text(win,font=("Consolas",10),bg="white",fg="#12395b",padx=20,pady=15); txt.pack(fill="both",expand=True,padx=20,pady=20)
         txt.insert("1.0","JARVIS AUTONOMOUS WORKFLOW REPORT\n"+"="*70+"\n\n"+("\n".join(f"[{a}] {b}: {c}" for a,b,c in actions) if actions else "No workflow actions currently required."))
+
+    def workflow_approval_summary(self):
+        actions=self.automation_scan()
+        return {"pending":len(actions),"high":sum(1 for a in actions if a[0]=="HIGH"),"medium":sum(1 for a in actions if a[0]=="MEDIUM")}
+
+    def analytics_snapshot(self):
+        x=self.executive_intelligence()
+        return {"resources":x["resources"],"available":x["available"],"open_complaints":x["open_complaints"],"avg_health":x["avg_health"],"avg_utilization":x["avg_utilization"]}
+
+    def campus_resource_map_data(self):
+        return read_csv("resources.csv",RESOURCE_HEADERS)
+
+    def intelligent_schedule_summary(self):
+        try: return self.calculate_utilization(datetime.now().date(),datetime.now().date())
+        except Exception: return []
+
+    def mobile_operations_summary(self):
+        return self.analytics_snapshot()
+
+    def security_status_summary(self):
+        users=read_csv("users.csv",USER_HEADERS)
+        return {"active":sum(1 for u in users if u.get("status","Active")=="Active"),"inactive":sum(1 for u in users if u.get("status","Active")=="Inactive")}
+
+    def generate_management_report(self):
+        self.generate_daily_summary()
+
+    def api_integration_status(self):
+        return {"mode":"CSV-backed local API-ready architecture","status":"Ready for integration"}
+
+    def production_health_check(self):
+        files=DATA_FILES
+        return {"data_files":len(files),"healthy":sum(1 for n in files if (Path("data")/n).exists()),"total":len(files)}
+
+    def final_release_check(self):
+        return {"versions_completed":"1-40","production_health":self.production_health_check(),"security":self.security_status_summary(),"analytics":self.analytics_snapshot()}
 
     def build_complaints(self):
         bar=tk.Frame(self.complaint_tab);bar.pack(fill="x",padx=15,pady=12);tk.Button(bar,text="+ New Complaint",command=self.add_complaint,bg="#0b4f8a",fg="white",bd=0,padx=15,pady=8).pack(side="left");tk.Button(bar,text="Refresh",command=self.refresh_complaints,padx=15,pady=7).pack(side="left",padx=8)
