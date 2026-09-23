@@ -413,6 +413,59 @@ class SmartCampusApp(tk.Tk):
         for x in complaints:
             if x.get("priority") in ("High","Critical") and x.get("status") not in ("Resolved","Closed"):alerts.append(f"{x.get('priority').upper()} COMPLAINT: {x.get('complaint_id')} - {x.get('title')}")
         self.alert_text.delete("1.0","end"); self.alert_text.insert("1.0","SMART CAMPUS ALERTS\n"+"="*60+"\n\n"+("\n".join("• "+a for a in alerts) if alerts else "No active alerts."))
+    def add_resource(self):
+        if self.user.role not in ("Admin","Faculty"):
+            messagebox.showerror("Access Denied","You do not have permission to add resources.")
+            return
+        win=tk.Toplevel(self); win.title("Add Resource"); win.geometry("500x650"); win.configure(bg="white")
+        fields={}
+        for label,key,default in (
+            ("Resource ID","resource_id",""),
+            ("Name","name",""),
+            ("Category","category",CATEGORIES[0]),
+            ("Location","location",""),
+            ("Capacity","capacity",""),
+            ("Department","department",""),
+            ("Condition","condition","Good"),
+            ("Assigned To","assigned_to",""),
+            ("Notes","notes",""),
+            ("Last Maintenance (YYYY-MM-DD)","last_maintenance",""),
+            ("Next Maintenance (YYYY-MM-DD)","next_maintenance",""),
+        ):
+            tk.Label(win,text=label,bg="white",fg="#345",font=("Segoe UI",10,"bold")).pack(anchor="w",padx=30,pady=(8,2))
+            if key=="category":
+                var=tk.StringVar(value=default); w=ttk.Combobox(win,textvariable=var,values=CATEGORIES,state="readonly"); w.pack(fill="x",padx=30); fields[key]=var
+            elif key=="condition":
+                var=tk.StringVar(value=default); w=ttk.Combobox(win,textvariable=var,values=("Excellent","Good","Fair","Poor","Critical"),state="readonly"); w.pack(fill="x",padx=30); fields[key]=var
+            else:
+                e=tk.Entry(win,font=("Segoe UI",10)); e.pack(fill="x",padx=30,ipady=5); e.insert(0,default); fields[key]=e
+        status=tk.StringVar(value="Available")
+        def val(key):
+            obj=fields[key]
+            return obj.get().strip()
+        def save():
+            vals={k:val(k) for k in fields}
+            if not vals["resource_id"] or not vals["name"] or not vals["location"]:
+                messagebox.showwarning("Required","Resource ID, Name and Location are required.",parent=win); return
+            try:
+                if vals["capacity"] and (not vals["capacity"].isdigit() or int(vals["capacity"])<0):
+                    raise ValueError
+            except ValueError:
+                messagebox.showwarning("Invalid Capacity","Capacity must be a non-negative number.",parent=win); return
+            for key in ("last_maintenance","next_maintenance"):
+                if vals[key] and not self.parse_report_date(vals[key]):
+                    messagebox.showwarning("Invalid Date",f"{key.replace('_',' ').title()} must be YYYY-MM-DD.",parent=win); return
+            rows=read_csv("resources.csv",RESOURCE_HEADERS)
+            if any(r.get("resource_id")==vals["resource_id"] for r in rows):
+                messagebox.showerror("Duplicate Resource","Resource ID already exists.",parent=win); return
+            row={k:vals.get(k,"") for k in RESOURCE_HEADERS}
+            row["status"]="Available"
+            append_csv("resources.csv",RESOURCE_HEADERS,row)
+            self.audit("RESOURCE_CREATED",row["resource_id"])
+            win.destroy(); self.refresh_resources(); self.refresh_cards(); self.refresh_professional_dashboard(); self.refresh_alerts(); self.refresh_analytics(); self.refresh_notifications(); self.refresh_audit()
+            messagebox.showinfo("Resource Added",f"Resource {row['resource_id']} was added successfully.")
+        tk.Button(win,text="Save Resource",command=save,bg="#0b4f8a",fg="white",bd=0,padx=20,pady=9).pack(pady=18)
+
     def build_resources(self):
         bar=tk.Frame(self.resource_tab); bar.pack(fill="x",padx=15,pady=12)
         tk.Button(bar,text="+ Add Resource",command=self.add_resource,bg="#0b4f8a",fg="white",bd=0,padx=15,pady=8).pack(side="left")
