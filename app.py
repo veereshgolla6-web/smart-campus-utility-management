@@ -1377,6 +1377,30 @@ class SmartCampusApp(tk.Tk):
         txt=tk.Text(win,font=("Consolas",10),bg="white",fg="#345",bd=0,padx=20,pady=15); txt.pack(fill="both",expand=True,padx=20,pady=10); txt.insert("1.0","\n".join(lines))
         self.audit("JARVIS_DAILY_SUMMARY","Generated daily campus intelligence summary")
 
+    def autonomous_workflow(self):
+        actions=self.automation_scan()
+        executed=0
+        for level,kind,msg in actions:
+            self.audit("JARVIS_AUTONOMOUS_ACTION",f"{level}|{kind}|{msg}")
+            executed+=1
+        return executed
+
+    def build_autonomous_operations(self):
+        bar=tk.Frame(self.automation_tab,bg="#eef4fb"); bar.pack(fill="x",padx=15,pady=8)
+        tk.Button(bar,text="Run Autonomous Operations",command=self.run_autonomous_operations,bg="#0b4f8a",fg="white",bd=0,padx=14,pady=8).pack(side="left")
+        tk.Button(bar,text="Workflow Report",command=self.generate_workflow_report,bg="#376a92",fg="white",bd=0,padx=14,pady=8).pack(side="left",padx=6)
+
+    def run_autonomous_operations(self):
+        n=self.autonomous_workflow()
+        messagebox.showinfo("JARVIS Operations",f"Autonomous workflow scan completed.\nActions evaluated: {n}")
+        self.refresh_automation_center()
+
+    def generate_workflow_report(self):
+        actions=self.automation_scan()
+        win=tk.Toplevel(self); win.title("JARVIS Workflow Report"); win.geometry("850x580")
+        txt=tk.Text(win,font=("Consolas",10),bg="white",fg="#12395b",padx=20,pady=15); txt.pack(fill="both",expand=True,padx=20,pady=20)
+        txt.insert("1.0","JARVIS AUTONOMOUS WORKFLOW REPORT\n"+"="*70+"\n\n"+("\n".join(f"[{a}] {b}: {c}" for a,b,c in actions) if actions else "No workflow actions currently required."))
+
     def build_complaints(self):
         bar=tk.Frame(self.complaint_tab);bar.pack(fill="x",padx=15,pady=12);tk.Button(bar,text="+ New Complaint",command=self.add_complaint,bg="#0b4f8a",fg="white",bd=0,padx=15,pady=8).pack(side="left");tk.Button(bar,text="Refresh",command=self.refresh_complaints,padx=15,pady=7).pack(side="left",padx=8)
         if self.user.role in ("Admin","Faculty"):tk.Button(bar,text="Update Selected",command=self.update_complaint,bg="#376a92",fg="white",bd=0,padx=12,pady=7).pack(side="left",padx=5)
