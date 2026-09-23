@@ -2,6 +2,17 @@
 
 A Python/Tkinter campus utility management system for resources, maintenance, complaints, usage, reports, analytics, alerts, backups, audit history, administration, and dashboard monitoring.
 
+## Version 19 — Advanced Resource Management
+- Resource capacity
+- Department ownership
+- Resource condition
+- Resource assignment
+- Resource notes
+- Advanced resource search by category, department, location and condition
+- Editable resource details
+- Capacity validation
+- Expanded resource records retained in reports and analytics
+
 ## Version 18 — Advanced User & Role Management
 - User search and filtering
 - Active/Inactive account status
