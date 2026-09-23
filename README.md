@@ -98,3 +98,17 @@ Operational data is stored in `data/`. Backups are stored in `backups/`. Audit h
 
 ## Python concepts demonstrated
 Decision making, loops, strings, lists, tuples, dictionaries, functions, file handling, exception handling, CSV persistence, dataclasses/OOP, Tkinter GUI, backup/restore, audit logging, user security, analytics, and dashboard design.
+
+
+## Version 20 — Resource Assignment & Availability Management
+
+Version 20 adds a dedicated reservation and availability workflow:
+- Resource reservation with date and time slots
+- Reservation conflict detection for overlapping bookings
+- Pending, Active, Cancelled and Completed reservation statuses
+- Reservation search and summary counts
+- Cancel and complete reservation actions
+- Resource availability/schedule view
+- Reservation notifications and audit events
+- Reservations included in backup and restore data
+- New reservation data file: `data/reservations.csv`
