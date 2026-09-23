@@ -163,13 +163,13 @@ class SmartCampusApp(tk.Tk):
     def show_dashboard(self):
         self.clear(); top=tk.Frame(self,bg="#0b4f8a",height=76); top.pack(fill="x"); tk.Label(top,text="Smart Campus Utility Management",font=("Segoe UI",20,"bold"),fg="white",bg="#0b4f8a").pack(side="left",padx=25,pady=18); tk.Label(top,text=f"{self.user.name}  •  {self.user.role}  •  Login: {self.session_started.strftime("%H:%M") if self.session_started else ""}",font=("Segoe UI",10),fg="white",bg="#0b4f8a").pack(side="right",padx=15); tk.Button(top,text="Logout",command=self.confirm_logout,bg="#083b68",fg="white",bd=0,padx=15,pady=8).pack(side="right"); tk.Button(top,text="My Profile",command=self.user_profile,bg="#376a92",fg="white",bd=0,padx=15,pady=8).pack(side="right",padx=5)
         body=tk.Frame(self,bg="#eef4fb"); body.pack(fill="both",expand=True,padx=20,pady=20); self.build_cards(body); notebook=ttk.Notebook(body); notebook.pack(fill="both",expand=True,pady=(18,0))
-        self.home_tab=ttk.Frame(notebook); self.notification_tab=ttk.Frame(notebook); self.resource_tab=ttk.Frame(notebook); self.reservation_tab=ttk.Frame(notebook); self.schedule_tab=ttk.Frame(notebook); self.health_tab=ttk.Frame(notebook); self.maintenance_plan_tab=ttk.Frame(notebook); self.prediction_tab=ttk.Frame(notebook); self.optimization_tab=ttk.Frame(notebook); self.forecast_tab=ttk.Frame(notebook); self.executive_tab=ttk.Frame(notebook); self.command_tab=ttk.Frame(notebook); self.complaint_tab=ttk.Frame(notebook); self.usage_tab=ttk.Frame(notebook); self.report_tab=ttk.Frame(notebook); self.analytics_tab=ttk.Frame(notebook); self.alert_tab=ttk.Frame(notebook); self.audit_tab=ttk.Frame(notebook)
-        for tab,text in ((self.home_tab,"Dashboard"),(self.notification_tab,"Notifications"),(self.resource_tab,"Resources"),(self.reservation_tab,"Reservations"),(self.schedule_tab,"Smart Scheduling"),(self.health_tab,"Resource Health"),(self.maintenance_plan_tab,"Maintenance Planning"),(self.prediction_tab,"Predictive Maintenance"),(self.optimization_tab,"AI Resource Optimization"),(self.forecast_tab,"Demand Forecasting"),(self.executive_tab,"Executive AI Dashboard"),(self.command_tab,"AI Command Center"),(self.complaint_tab,"Complaints"),(self.usage_tab,"Usage"),(self.report_tab,"Reports"),(self.analytics_tab,"Analytics"),(self.alert_tab,"Alerts"),(self.audit_tab,"Audit")):notebook.add(tab,text=f"  {text}  ")
+        self.home_tab=ttk.Frame(notebook); self.notification_tab=ttk.Frame(notebook); self.resource_tab=ttk.Frame(notebook); self.reservation_tab=ttk.Frame(notebook); self.schedule_tab=ttk.Frame(notebook); self.health_tab=ttk.Frame(notebook); self.maintenance_plan_tab=ttk.Frame(notebook); self.prediction_tab=ttk.Frame(notebook); self.optimization_tab=ttk.Frame(notebook); self.forecast_tab=ttk.Frame(notebook); self.executive_tab=ttk.Frame(notebook); self.command_tab=ttk.Frame(notebook); self.automation_tab=ttk.Frame(notebook); self.complaint_tab=ttk.Frame(notebook); self.usage_tab=ttk.Frame(notebook); self.report_tab=ttk.Frame(notebook); self.analytics_tab=ttk.Frame(notebook); self.alert_tab=ttk.Frame(notebook); self.audit_tab=ttk.Frame(notebook)
+        for tab,text in ((self.home_tab,"Dashboard"),(self.notification_tab,"Notifications"),(self.resource_tab,"Resources"),(self.reservation_tab,"Reservations"),(self.schedule_tab,"Smart Scheduling"),(self.health_tab,"Resource Health"),(self.maintenance_plan_tab,"Maintenance Planning"),(self.prediction_tab,"Predictive Maintenance"),(self.optimization_tab,"AI Resource Optimization"),(self.forecast_tab,"Demand Forecasting"),(self.executive_tab,"Executive AI Dashboard"),(self.command_tab,"AI Command Center"),(self.automation_tab,"JARVIS Automation"),(self.complaint_tab,"Complaints"),(self.usage_tab,"Usage"),(self.report_tab,"Reports"),(self.analytics_tab,"Analytics"),(self.alert_tab,"Alerts"),(self.audit_tab,"Audit")):notebook.add(tab,text=f"  {text}  ")
         if self.user.role=="Admin":
             self.user_tab=ttk.Frame(notebook); notebook.add(self.user_tab,text="  Users  ")
             self.admin_tab=ttk.Frame(notebook); notebook.add(self.admin_tab,text="  Admin Center  ")
             self.build_backup_controls(); self.build_admin_center()
-        self.build_professional_dashboard(self.home_tab); self.build_notifications(self.notification_tab); self.build_resources(); self.build_reservations(); self.build_smart_scheduling(); self.build_resource_health(); self.build_maintenance_planning(); self.build_predictive_maintenance(); self.build_resource_optimization(); self.build_demand_forecasting(); self.build_executive_dashboard(); self.build_command_center(); self.build_complaints(); self.build_usage(); self.build_reports(); self.build_analytics(); self.build_alerts(); self.build_audit()
+        self.build_professional_dashboard(self.home_tab); self.build_notifications(self.notification_tab); self.build_resources(); self.build_reservations(); self.build_smart_scheduling(); self.build_resource_health(); self.build_maintenance_planning(); self.build_predictive_maintenance(); self.build_resource_optimization(); self.build_demand_forecasting(); self.build_executive_dashboard(); self.build_command_center(); self.build_automation_center(); self.build_complaints(); self.build_usage(); self.build_reports(); self.build_analytics(); self.build_alerts(); self.build_audit()
         if self.user.role=="Admin":self.build_users()
     def build_professional_dashboard(self,parent):
         frame=tk.Frame(parent,bg="#eef4fb"); frame.pack(fill="both",expand=True)
@@ -1304,6 +1304,78 @@ class SmartCampusApp(tk.Tk):
         self.command_text.insert("end",f"\n\n[{stamp}] YOU: {q}\nJARVIS: {answer}")
         self.command_text.see("end")
         self.audit("COMMAND_CENTER_QUERY",q)
+
+    def automation_scan(self):
+        actions=[]; today=datetime.now().date()
+        resources=read_csv("resources.csv",RESOURCE_HEADERS); complaints=read_csv("complaints.csv",COMPLAINT_HEADERS)
+        for r in resources:
+            rid=r.get("resource_id",""); score,reasons=self.resource_health_score(rid)
+            if r.get("status")=="Out of Service": actions.append(("HIGH","RESOURCE",f"{rid} is Out of Service."))
+            if score<50: actions.append(("HIGH","HEALTH",f"{rid} health score is {score}/100."))
+            nxt=r.get("next_maintenance","").strip()
+            if nxt:
+                try:
+                    days=(datetime.strptime(nxt,"%Y-%m-%d").date()-today).days
+                    if days<0: actions.append(("HIGH","MAINTENANCE",f"{rid} maintenance is overdue by {abs(days)} day(s)."))
+                    elif days<=3: actions.append(("MEDIUM","MAINTENANCE",f"{rid} maintenance is due in {days} day(s)."))
+                except ValueError: actions.append(("HIGH","MAINTENANCE",f"{rid} has an invalid maintenance date."))
+        for c in complaints:
+            if c.get("priority") in ("High","Critical") and c.get("status") not in ("Resolved","Closed"):
+                actions.append(("HIGH","COMPLAINT",f"{c.get('complaint_id')} is {c.get('priority')} priority and unresolved."))
+        metrics=self.resource_optimization_metrics()
+        for m in metrics:
+            if m["utilization"]>85: actions.append(("MEDIUM","CAPACITY",f"{m['resource_id']} utilization is {m['utilization']:.1f}%; review capacity."))
+        monthly,avg,trend,forecast=self.demand_forecast_metrics()
+        if trend>20: actions.append(("MEDIUM","DEMAND",f"Demand trend is rising {trend:.1f}%; review capacity planning."))
+        return actions
+
+    def run_automation_scan(self):
+        actions=self.automation_scan()
+        existing=read_csv("notifications.csv",NOTIFICATION_HEADERS)
+        keys={(r.get("type"),r.get("message"),r.get("username")) for r in existing}
+        created=0
+        for level,kind,msg in actions:
+            key=("JARVIS_"+kind,msg,self.user.username)
+            if key not in keys:
+                self.notify("JARVIS_"+kind,f"JARVIS {level} Alert",msg); keys.add(key); created+=1
+        self.audit("JARVIS_AUTOMATION_SCAN",f"{len(actions)} action(s), {created} new notification(s)")
+        self.refresh_notifications()
+        self.refresh_automation_center()
+        return actions,created
+
+    def build_automation_center(self):
+        bar=tk.Frame(self.automation_tab,bg="#eef4fb"); bar.pack(fill="x",padx=15,pady=12)
+        tk.Button(bar,text="Run JARVIS Scan",command=self.run_automation_scan,bg="#0b4f8a",fg="white",bd=0,padx=14,pady=8).pack(side="left")
+        tk.Button(bar,text="Refresh",command=self.refresh_automation_center,bg="#376a92",fg="white",bd=0,padx=14,pady=8).pack(side="left",padx=6)
+        tk.Button(bar,text="Generate Daily Summary",command=self.generate_daily_summary,bg="#657789",fg="white",bd=0,padx=14,pady=8).pack(side="left",padx=6)
+        self.automation_text=tk.Text(self.automation_tab,font=("Consolas",10),bg="white",fg="#12395b",bd=0,padx=20,pady=15)
+        self.automation_text.pack(fill="both",expand=True,padx=15,pady=10)
+        self.refresh_automation_center()
+
+    def refresh_automation_center(self):
+        if not hasattr(self,"automation_text"): return
+        actions=self.automation_scan()
+        lines=["JARVIS PROACTIVE CAMPUS INTELLIGENCE","="*70,"",f"Detected actions: {len(actions)}",""]
+        if actions:
+            lines += [f"[{level}] {kind}: {msg}" for level,kind,msg in actions]
+        else: lines.append("No immediate action detected.")
+        self.automation_text.delete("1.0","end"); self.automation_text.insert("1.0","\n".join(lines))
+
+    def generate_daily_summary(self):
+        x=self.executive_intelligence(); monthly,avg,trend,forecast=self.demand_forecast_metrics(); actions=self.automation_scan()
+        lines=["JARVIS DAILY CAMPUS INTELLIGENCE SUMMARY","="*70,
+               f"Generated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}","",
+               f"Resources: {x['resources']} | Available: {x['available']}",
+               f"Average Health: {x['avg_health']:.1f}/100 | Average Utilization: {x['avg_utilization']:.1f}%",
+               f"Open Complaints: {x['open_complaints']} | Priority Alerts: {x['alerts']}",
+               f"Maintenance Cost: {x['maintenance_cost']:.2f}",
+               f"Demand Trend: {trend:+.1f}% | Baseline: {avg:.1f} hours/month","",
+               f"Priority Actions: {len(actions)}"]
+        lines += [f"• [{a}] {b}: {c}" for a,b,c in actions]
+        win=tk.Toplevel(self); win.title("JARVIS Daily Summary"); win.geometry("850x580"); win.configure(bg="#eef4fb")
+        tk.Label(win,text="JARVIS DAILY CAMPUS INTELLIGENCE",font=("Segoe UI",17,"bold"),fg="#12395b",bg="#eef4fb").pack(pady=15)
+        txt=tk.Text(win,font=("Consolas",10),bg="white",fg="#345",bd=0,padx=20,pady=15); txt.pack(fill="both",expand=True,padx=20,pady=10); txt.insert("1.0","\n".join(lines))
+        self.audit("JARVIS_DAILY_SUMMARY","Generated daily campus intelligence summary")
 
     def build_complaints(self):
         bar=tk.Frame(self.complaint_tab);bar.pack(fill="x",padx=15,pady=12);tk.Button(bar,text="+ New Complaint",command=self.add_complaint,bg="#0b4f8a",fg="white",bd=0,padx=15,pady=8).pack(side="left");tk.Button(bar,text="Refresh",command=self.refresh_complaints,padx=15,pady=7).pack(side="left",padx=8)
