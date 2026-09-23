@@ -1,0 +1,4 @@
+resource_id,name,category,location,status
+R001,Projector,Projector,Block A Room 101,Available
+R002,Desktop Computer,Computer/IT,CSE Lab 1,Available
+R003,Printer,Other,Admin Office,Available
