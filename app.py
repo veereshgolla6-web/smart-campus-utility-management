@@ -20,7 +20,7 @@ AUDIT_HEADERS=("timestamp","username","role","action","details")
 
 class SmartCampusApp(tk.Tk):
     def __init__(self):
-        super().__init__(); self.title("Smart Campus Utility Management System"); self.geometry("1180x720"); self.minsize(1000,620); self.configure(bg="#eef4fb"); self.user=None
+        super().__init__(); self.title("Smart Campus Utility Management System"); self.geometry("1180x720"); self.minsize(1000,620); self.configure(bg="#eef4fb"); self.user=None; self.login_attempts=0; self.session_started=None
         self.style=ttk.Style(self)
         try:self.style.theme_use("clam")
         except tk.TclError:pass
@@ -68,19 +68,25 @@ class SmartCampusApp(tk.Tk):
 
     def clear(self):
         for w in self.winfo_children():w.destroy()
+    def toggle_password(self,entry,button):
+        if entry.cget("show"): entry.config(show=""); button.config(text="Hide")
+        else: entry.config(show="•"); button.config(text="Show")
     def show_login(self):
         self.clear(); frame=tk.Frame(self,bg="#0b4f8a",width=520,height=720); frame.pack(side="left",fill="both",expand=True); frame.pack_propagate(False)
         tk.Label(frame,text="SMART CAMPUS",font=("Segoe UI",30,"bold"),fg="white",bg="#0b4f8a").pack(pady=(150,5)); tk.Label(frame,text="UTILITY MANAGEMENT",font=("Segoe UI",20),fg="#d9ecff",bg="#0b4f8a").pack(); tk.Label(frame,text="Resource Tracking • Maintenance • Reports",font=("Segoe UI",11),fg="white",bg="#0b4f8a").pack(pady=20)
         card=tk.Frame(self,bg="white"); card.pack(side="right",fill="both",expand=True,padx=70,pady=90); tk.Label(card,text="Welcome Back",font=("Segoe UI",25,"bold"),fg="#12395b",bg="white").pack(pady=(55,5)); tk.Label(card,text="Sign in to continue",font=("Segoe UI",11),fg="#6b7b8c",bg="white").pack(pady=(0,30))
-        self.login_user=self.entry(card,"Username"); self.login_pass=self.entry(card,"Password",True); self.login_pass.bind("<Return>",lambda e:self.login()); tk.Button(card,text="LOGIN",command=self.login,bg="#0b4f8a",fg="white",font=("Segoe UI",11,"bold"),bd=0,cursor="hand2",width=24,height=2).pack(pady=25); tk.Label(card,text="Demo: admin / admin123   |   faculty / faculty123",font=("Segoe UI",9),fg="#7a8794",bg="white").pack()
+        self.login_user=self.entry(card,"Username"); self.login_pass=self.entry(card,"Password",True); self.login_pass.bind("<Return>",lambda e:self.login()); pwbtn=tk.Button(card,text="Show",command=lambda:self.toggle_password(self.login_pass,pwbtn),bg="white",fg="#0b4f8a",bd=0); pwbtn.place(relx=0.80,rely=0.40); tk.Button(card,text="LOGIN",command=self.login,bg="#0b4f8a",fg="white",font=("Segoe UI",11,"bold"),bd=0,cursor="hand2",width=24,height=2).pack(pady=25); tk.Label(card,text="Demo: admin / admin123   |   faculty / faculty123",font=("Segoe UI",9),fg="#7a8794",bg="white").pack()
     def entry(self,parent,label,password=False):
         tk.Label(parent,text=label,font=("Segoe UI",10,"bold"),fg="#345",bg="white",anchor="w").pack(fill="x",padx=65,pady=(8,3)); e=tk.Entry(parent,font=("Segoe UI",12),show="•" if password else "",relief="solid",bd=1); e.pack(fill="x",padx=65,ipady=9); return e
     def login(self):
-        users=read_csv("users.csv",USER_HEADERS); u=self.login_user.get().strip(); p=self.login_pass.get().strip(); row=next((x for x in users if x["username"]==u and x["password"]==p),None)
-        if not row:messagebox.showerror("Login Failed","Invalid username or password."); return
-        self.user=User(u,p,row["role"],row["name"]); self.show_dashboard(); self.audit("LOGIN","Successful login")
+        if self.login_attempts>=5:
+            messagebox.showerror("Login Locked","Too many failed attempts. Restart the application to try again."); return
+        users=read_csv("users.csv",USER_HEADERS); u=self.login_user.get().strip(); p=self.login_pass.get(); row=next((x for x in users if x["username"]==u and x["password"]==p),None)
+        if not row:
+            self.login_attempts+=1; messagebox.showerror("Login Failed",f"Invalid username or password. Attempts remaining: {max(0,5-self.login_attempts)}"); return
+        self.login_attempts=0; self.user=User(u,p,row["role"],row["name"]); self.session_started=datetime.now(); self.show_dashboard(); self.audit("LOGIN","Successful login")
     def show_dashboard(self):
-        self.clear(); top=tk.Frame(self,bg="#0b4f8a",height=76); top.pack(fill="x"); tk.Label(top,text="Smart Campus Utility Management",font=("Segoe UI",20,"bold"),fg="white",bg="#0b4f8a").pack(side="left",padx=25,pady=18); tk.Label(top,text=f"{self.user.name}  •  {self.user.role}",font=("Segoe UI",10),fg="white",bg="#0b4f8a").pack(side="right",padx=15); tk.Button(top,text="Logout",command=self.show_login,bg="#083b68",fg="white",bd=0,padx=15,pady=8).pack(side="right")
+        self.clear(); top=tk.Frame(self,bg="#0b4f8a",height=76); top.pack(fill="x"); tk.Label(top,text="Smart Campus Utility Management",font=("Segoe UI",20,"bold"),fg="white",bg="#0b4f8a").pack(side="left",padx=25,pady=18); tk.Label(top,text=f"{self.user.name}  •  {self.user.role}  •  Login: {self.session_started.strftime("%H:%M") if self.session_started else ""}",font=("Segoe UI",10),fg="white",bg="#0b4f8a").pack(side="right",padx=15); tk.Button(top,text="Logout",command=self.show_login,bg="#083b68",fg="white",bd=0,padx=15,pady=8).pack(side="right")
         body=tk.Frame(self,bg="#eef4fb"); body.pack(fill="both",expand=True,padx=20,pady=20); self.build_cards(body); notebook=ttk.Notebook(body); notebook.pack(fill="both",expand=True,pady=(18,0))
         self.home_tab=ttk.Frame(notebook); self.resource_tab=ttk.Frame(notebook); self.complaint_tab=ttk.Frame(notebook); self.usage_tab=ttk.Frame(notebook); self.report_tab=ttk.Frame(notebook); self.analytics_tab=ttk.Frame(notebook); self.alert_tab=ttk.Frame(notebook); self.audit_tab=ttk.Frame(notebook)
         for tab,text in ((self.home_tab,"Dashboard"),(self.resource_tab,"Resources"),(self.complaint_tab,"Complaints"),(self.usage_tab,"Usage"),(self.report_tab,"Reports"),(self.analytics_tab,"Analytics"),(self.alert_tab,"Alerts"),(self.audit_tab,"Audit")):notebook.add(tab,text=f"  {text}  ")
