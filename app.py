@@ -1,6 +1,6 @@
 import tkinter as tk
 from tkinter import ttk, messagebox
-from datetime import datetime
+from datetime import datetime, timedelta
 from pathlib import Path
 import shutil
 import csv
@@ -612,7 +612,7 @@ class SmartCampusApp(tk.Tk):
         choice=self.schedule_period_var.get()
         today=datetime.now().date()
         if choice=="Today": return today,today
-        return today,today.replace() if False else today+__import__("datetime").timedelta(days=6)
+        return today,today+timedelta(days=6)
 
     def calculate_utilization(self,start_date,end_date):
         resources=read_csv("resources.csv",RESOURCE_HEADERS)
@@ -641,6 +641,8 @@ class SmartCampusApp(tk.Tk):
         tk.Button(bar,text="Refresh Utilization",command=self.refresh_smart_scheduling,bg="#0b4f8a",fg="white",bd=0,padx=14,pady=8).pack(side="left",padx=5)
         tk.Button(bar,text="Find Available Slot",command=self.find_available_slot,bg="#376a92",fg="white",bd=0,padx=14,pady=8).pack(side="left",padx=5)
         tk.Button(bar,text="Conflict Check",command=self.show_schedule_conflicts,bg="#8a5a0b",fg="white",bd=0,padx=14,pady=8).pack(side="left",padx=5)
+        tk.Button(bar,text="Weekly Calendar",command=self.show_weekly_calendar,bg="#657789",fg="white",bd=0,padx=14,pady=8).pack(side="left",padx=5)
+        tk.Button(bar,text="Department Usage",command=self.show_department_usage,bg="#5b7f5b",fg="white",bd=0,padx=14,pady=8).pack(side="left",padx=5)
         self.schedule_kpi=tk.StringVar(value="")
         tk.Label(bar,textvariable=self.schedule_kpi,bg="#eef4fb",fg="#12395b",font=("Segoe UI",10,"bold")).pack(side="right",padx=8)
         self.util_tree=self.tree(self.schedule_tab,("resource_id","name","department","capacity_hours","reserved_hours","utilization_percent"))
@@ -657,6 +659,39 @@ class SmartCampusApp(tk.Tk):
         busiest=max(stats,key=lambda z:z["utilization"])["name"] if stats else "None"
         least=min(stats,key=lambda z:z["utilization"])["name"] if stats else "None"
         self.schedule_kpi.set(f"Resources: {total}  |  Average utilization: {avg:.1f}%  |  Most used: {busiest}  |  Least used: {least}")
+
+    def show_weekly_calendar(self):
+        start,end=self.schedule_period()
+        rows=[r for r in read_csv("reservations.csv",RESERVATION_HEADERS) if r.get("status") not in ("Cancelled","Completed")]
+        win=tk.Toplevel(self); win.title("Weekly Resource Calendar"); win.geometry("1100x620"); win.configure(bg="#eef4fb")
+        tk.Label(win,text="RESOURCE SCHEDULE CALENDAR",font=("Segoe UI",18,"bold"),fg="#12395b",bg="#eef4fb").pack(pady=(15,3))
+        tk.Label(win,text=f"{start.strftime('%Y-%m-%d')} to {end.strftime('%Y-%m-%d')}",fg="#60758a",bg="#eef4fb").pack(pady=(0,10))
+        cols=("resource","date","time","reserved_by","department","purpose","status")
+        tree=self.tree(win,cols)
+        for r in sorted(rows,key=lambda x:(x.get("date",""),x.get("resource_id",""),x.get("start_time",""))):
+            try: d=datetime.strptime(r.get("date",""),"%Y-%m-%d").date()
+            except ValueError: continue
+            if start<=d<=end:
+                tree.insert("","end",values=(r.get("resource_id",""),r.get("date",""),f"{r.get('start_time','')} - {r.get('end_time','')}",r.get("reserved_by",""),r.get("department",""),r.get("purpose",""),r.get("status","")))
+        if not tree.get_children(): tk.Label(win,text="No reservations in this period.",bg="#eef4fb",fg="#60758a").pack(pady=15)
+
+    def show_department_usage(self):
+        start,end=self.schedule_period()
+        rows=[r for r in read_csv("reservations.csv",RESERVATION_HEADERS) if r.get("status") not in ("Cancelled","Completed")]
+        totals={}
+        for r in rows:
+            try: d=datetime.strptime(r.get("date",""),"%Y-%m-%d").date()
+            except ValueError: continue
+            if start<=d<=end:
+                dept=r.get("department","").strip() or "Unassigned"
+                totals[dept]=totals.get(dept,0.0)+self.reservation_hours(r)
+        win=tk.Toplevel(self); win.title("Department Resource Utilization"); win.geometry("650x430"); win.configure(bg="white")
+        tk.Label(win,text="DEPARTMENT-WISE RESOURCE USAGE",font=("Segoe UI",16,"bold"),fg="#12395b",bg="white").pack(pady=15)
+        tree=self.tree(win,("department","reserved_hours","share_percent"))
+        total=sum(totals.values())
+        for dept,hours in sorted(totals.items(),key=lambda x:x[1],reverse=True):
+            tree.insert("","end",values=(dept,f"{hours:.1f}",f"{hours/total*100:.1f}%" if total else "0.0%"))
+        if not totals: tk.Label(win,text="No department reservation data for this period.",bg="white",fg="#60758a").pack(pady=15)
 
     def show_schedule_conflicts(self):
         rows=read_csv("reservations.csv",RESERVATION_HEADERS); conflicts=[]
