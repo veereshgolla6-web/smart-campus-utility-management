@@ -186,7 +186,80 @@ class SmartCampusApp(tk.Tk):
             if any(x["username"].lower()==vals["username"].lower() for x in rows):messagebox.showerror("Duplicate","Username already exists.",parent=win); return
             vals["role"]=role.get(); append_csv("users.csv",USER_HEADERS,vals); self.audit("USER_CREATED",vals["username"]); win.destroy(); self.refresh_users(); self.refresh_audit()
         tk.Button(win,text="Create User",command=save,bg="#0b4f8a",fg="white",bd=0,padx=20,pady=9).pack(pady=25)
+    def draw_bar_chart(self,canvas,title,labels,values):
+        canvas.delete("all")
+        w=max(canvas.winfo_width(),420); h=max(canvas.winfo_height(),230)
+        canvas.create_text(15,15,text=title,anchor="nw",font=("Segoe UI",12,"bold"),fill="#12395b")
+        if not values or sum(values)==0:
+            canvas.create_text(w/2,h/2,text="No data available",font=("Segoe UI",11),fill="#71859a"); return
+        maxv=max(values) or 1; left=45; bottom=h-35; top=50; gap=12
+        usable=w-left-20; bw=max(18,(usable-gap*max(1,len(values)-1))/max(1,len(values)))
+        for i,(lab,val) in enumerate(zip(labels,values)):
+            x=left+i*(bw+gap); bh=(h-top-45)*(val/maxv); y=bottom-bh
+            canvas.create_rectangle(x,y,x+bw,bottom,fill="#2f80c0",outline="")
+            canvas.create_text(x+bw/2,bottom+8,text=str(lab)[:12],anchor="n",font=("Segoe UI",8),fill="#456")
+            canvas.create_text(x+bw/2,y-4,text=str(val),anchor="s",font=("Segoe UI",8,"bold"),fill="#12395b")
+
+    def draw_horizontal_chart(self,canvas,title,labels,values):
+        canvas.delete("all")
+        w=max(canvas.winfo_width(),420); h=max(canvas.winfo_height(),230)
+        canvas.create_text(15,15,text=title,anchor="nw",font=("Segoe UI",12,"bold"),fill="#12395b")
+        if not values or sum(values)==0:
+            canvas.create_text(w/2,h/2,text="No data available",font=("Segoe UI",11),fill="#71859a"); return
+        maxv=max(values) or 1; start=125; barw=w-start-25; row=max(28,(h-65)/len(values))
+        for i,(lab,val) in enumerate(zip(labels,values)):
+            y=52+i*row; width=barw*(val/maxv)
+            canvas.create_text(start-8,y+9,text=str(lab),anchor="e",font=("Segoe UI",9),fill="#456")
+            canvas.create_rectangle(start,y,start+barw,y+18,fill="#e4edf6",outline="")
+            canvas.create_rectangle(start,y,start+width,y+18,fill="#0b4f8a",outline="")
+            canvas.create_text(start+width+5,y+9,text=str(val),anchor="w",font=("Segoe UI",9,"bold"),fill="#12395b")
+
     def build_analytics(self):
+        bar=tk.Frame(self.analytics_tab); bar.pack(fill="x",padx=15,pady=12)
+        tk.Button(bar,text="Refresh Analytics",command=self.refresh_analytics,bg="#0b4f8a",fg="white",bd=0,padx=15,pady=8).pack(side="left")
+        self.chart_area=tk.Frame(self.analytics_tab,bg="#eef4fb"); self.chart_area.pack(fill="both",expand=True,padx=10,pady=5)
+        self.chart1=tk.Canvas(self.chart_area,bg="white",highlightthickness=1,highlightbackground="#d8e2ee"); self.chart1.pack(side="left",fill="both",expand=True,padx=5,pady=5)
+        self.chart2=tk.Canvas(self.chart_area,bg="white",highlightthickness=1,highlightbackground="#d8e2ee"); self.chart2.pack(side="left",fill="both",expand=True,padx=5,pady=5)
+        self.chart3=tk.Canvas(self.analytics_tab,bg="white",height=250,highlightthickness=1,highlightbackground="#d8e2ee"); self.chart3.pack(fill="both",expand=False,padx=15,pady=5)
+        self.analytics_text=tk.Text(self.analytics_tab,font=("Consolas",10),bg="white",fg="#12395b",bd=0,padx=15,pady=10,height=7)
+        self.analytics_text.pack(fill="x",padx=15,pady=5)
+        self.refresh_analytics()
+
+    def refresh_analytics(self):
+        resources=read_csv("resources.csv",RESOURCE_HEADERS); complaints=read_csv("complaints.csv",COMPLAINT_HEADERS); usage=read_csv("usage.csv",USAGE_HEADERS)
+        status_labels=list(RESOURCE_STATUSES); status_values=[sum(r.get("status")==s for r in resources) for s in status_labels]
+        priority_labels=list(PRIORITIES); priority_values=[sum(x.get("priority")==p for x in complaints) for p in priority_labels]
+        counts={}
+        for u in usage: counts[u.get("resource_id","Unknown")]=counts.get(u.get("resource_id","Unknown"),0)+1
+        usage_items=sorted(counts.items(),key=lambda x:x[1],reverse=True)[:8]
+        self.draw_bar_chart(self.chart1,"Resource Utilization",status_labels,status_values)
+        self.draw_bar_chart(self.chart2,"Complaint Priority",priority_labels,priority_values)
+        self.draw_horizontal_chart(self.chart3,"Resource Usage Records",[x[0] for x in usage_items],[x[1] for x in usage_items])
+        resolved=sum(x.get("status") in ("Resolved","Closed") for x in complaints)
+        resolution=(resolved/len(complaints)*100) if complaints else 0
+        maintenance=sum(r.get("status")=="Maintenance" for r in resources)
+        upcoming=0; today=datetime.now().date()
+        for r in resources:
+            nxt=r.get("next_maintenance","").strip()
+            if nxt:
+                try:
+                    if 0 <= (datetime.strptime(nxt,"%Y-%m-%d").date()-today).days <= 30: upcoming+=1
+                except ValueError: pass
+        lines=["SMART CAMPUS VISUAL ANALYTICS","="*55,"",f"Total resources: {len(resources)}",f"Maintenance resources: {maintenance}",f"Upcoming maintenance (30 days): {upcoming}",f"Total complaints: {len(complaints)}",f"Resolution rate: {resolution:.1f}%",f"Total usage records: {len(usage)}","", "Charts: Resource utilization | Complaint priority | Resource usage"]
+        self.analytics_text.delete("1.0","end"); self.analytics_text.insert("1.0","\\n".join(lines))
+        self.chart1.after(100,self._redraw_charts)
+
+    def _redraw_charts(self):
+        if hasattr(self,"chart1"):
+            resources=read_csv("resources.csv",RESOURCE_HEADERS); complaints=read_csv("complaints.csv",COMPLAINT_HEADERS); usage=read_csv("usage.csv",USAGE_HEADERS)
+            self.draw_bar_chart(self.chart1,"Resource Utilization",list(RESOURCE_STATUSES),[sum(r.get("status")==s for r in resources) for s in RESOURCE_STATUSES])
+            self.draw_bar_chart(self.chart2,"Complaint Priority",list(PRIORITIES),[sum(x.get("priority")==p for x in complaints) for p in PRIORITIES])
+            counts={}
+            for u in usage: counts[u.get("resource_id","Unknown")]=counts.get(u.get("resource_id","Unknown"),0)+1
+            items=sorted(counts.items(),key=lambda x:x[1],reverse=True)[:8]
+            self.draw_horizontal_chart(self.chart3,"Resource Usage Records",[x[0] for x in items],[x[1] for x in items])
+
+
         bar=tk.Frame(self.analytics_tab); bar.pack(fill="x",padx=15,pady=12); tk.Button(bar,text="Refresh Analytics",command=self.refresh_analytics,bg="#0b4f8a",fg="white",bd=0,padx=15,pady=8).pack(side="left"); self.analytics_text=tk.Text(self.analytics_tab,font=("Consolas",11),bg="white",fg="#12395b",bd=0,padx=20,pady=20); self.analytics_text.pack(fill="both",expand=True,padx=15,pady=10); self.refresh_analytics()
     def refresh_analytics(self):
         resources=read_csv("resources.csv",RESOURCE_HEADERS); complaints=read_csv("complaints.csv",COMPLAINT_HEADERS); usage=read_csv("usage.csv",USAGE_HEADERS); lines=["SMART CAMPUS ANALYTICS","="*55,"",f"Total resources: {len(resources)}",f"Available: {sum(r.get('status')=='Available' for r in resources)}",f"In Use: {sum(r.get('status')=='In Use' for r in resources)}",f"Maintenance: {sum(r.get('status')=='Maintenance' for r in resources)}",f"Out of Service: {sum(r.get('status')=='Out of Service' for r in resources)}","",f"Total complaints: {len(complaints)}"]
