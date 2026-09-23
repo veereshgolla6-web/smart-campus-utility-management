@@ -80,8 +80,8 @@ class SmartCampusApp(tk.Tk):
         body=tk.Frame(self,bg="#eef4fb"); body.pack(fill="both",expand=True,padx=20,pady=20)
         self.build_cards(body)
         notebook=ttk.Notebook(body); notebook.pack(fill="both",expand=True,pady=(18,0))
-        self.resource_tab=ttk.Frame(notebook); self.complaint_tab=ttk.Frame(notebook); self.usage_tab=ttk.Frame(notebook); self.report_tab=ttk.Frame(notebook)
-        notebook.add(self.resource_tab,text="  Resources  "); notebook.add(self.complaint_tab,text="  Complaints  "); notebook.add(self.usage_tab,text="  Usage  "); notebook.add(self.report_tab,text="  Reports  ")
+        self.resource_tab=ttk.Frame(notebook); self.complaint_tab=ttk.Frame(notebook); self.usage_tab=ttk.Frame(notebook); self.report_tab=ttk.Frame(notebook); self.analytics_tab=ttk.Frame(notebook)
+        notebook.add(self.resource_tab,text="  Resources  "); notebook.add(self.complaint_tab,text="  Complaints  "); notebook.add(self.usage_tab,text="  Usage  "); notebook.add(self.report_tab,text="  Reports  "); notebook.add(self.analytics_tab,text="  Analytics  ")
         if self.user.role == "Admin":
             self.user_tab=ttk.Frame(notebook); notebook.add(self.user_tab,text="  Users  ")
         self.build_resources(); self.build_complaints(); self.build_usage(); self.build_reports()
@@ -144,6 +144,28 @@ class SmartCampusApp(tk.Tk):
             vals["role"]=role.get(); append_csv("users.csv",USER_HEADERS,vals)
             win.destroy(); self.refresh_users()
         tk.Button(win,text="Create User",command=save,bg="#0b4f8a",fg="white",bd=0,padx=20,pady=9).pack(pady=25)
+
+    def build_analytics(self):
+        bar=tk.Frame(self.analytics_tab); bar.pack(fill="x",padx=15,pady=12)
+        tk.Button(bar,text="Refresh Analytics",command=self.refresh_analytics,bg="#0b4f8a",fg="white",bd=0,padx=15,pady=8).pack(side="left")
+        self.analytics_text=tk.Text(self.analytics_tab,font=("Consolas",11),bg="white",fg="#12395b",bd=0,padx=20,pady=20)
+        self.analytics_text.pack(fill="both",expand=True,padx=15,pady=10)
+        self.refresh_analytics()
+
+    def refresh_analytics(self):
+        resources=read_csv("resources.csv",RESOURCE_HEADERS)
+        complaints=read_csv("complaints.csv",COMPLAINT_HEADERS)
+        usage=read_csv("usage.csv",USAGE_HEADERS)
+        lines=["SMART CAMPUS ANALYTICS","="*55,"",f"Total resources: {len(resources)}",f"Available: {sum(r['status']=='Available' for r in resources)}",f"In Use: {sum(r['status']=='In Use' for r in resources)}",f"Maintenance: {sum(r['status']=='Maintenance' for r in resources)}",f"Out of Service: {sum(r['status']=='Out of Service' for r in resources)}","",f"Total complaints: {len(complaints)}"]
+        for p in PRIORITIES: lines.append(f"{p} priority: {sum(x['priority']==p for x in complaints)}")
+        resolved=sum(x["status"] in ("Resolved","Closed") for x in complaints)
+        if complaints: lines.append(f"Resolution rate: {resolved/len(complaints)*100:.1f}%")
+        lines += ["",f"Total usage records: {len(usage)}","", "RESOURCE USAGE"]
+        counts={}
+        for u in usage: counts[u["resource_id"]]=counts.get(u["resource_id"],0)+1
+        for rid,count in sorted(counts.items(),key=lambda x:x[1],reverse=True):
+            lines.append(f"{rid}: {count} usage record(s)")
+        self.analytics_text.delete("1.0","end"); self.analytics_text.insert("1.0","\n".join(lines))
 
     def build_resources(self):
         bar=tk.Frame(self.resource_tab); bar.pack(fill="x",padx=15,pady=12)
