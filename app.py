@@ -163,13 +163,13 @@ class SmartCampusApp(tk.Tk):
     def show_dashboard(self):
         self.clear(); top=tk.Frame(self,bg="#0b4f8a",height=76); top.pack(fill="x"); tk.Label(top,text="Smart Campus Utility Management",font=("Segoe UI",20,"bold"),fg="white",bg="#0b4f8a").pack(side="left",padx=25,pady=18); tk.Label(top,text=f"{self.user.name}  •  {self.user.role}  •  Login: {self.session_started.strftime("%H:%M") if self.session_started else ""}",font=("Segoe UI",10),fg="white",bg="#0b4f8a").pack(side="right",padx=15); tk.Button(top,text="Logout",command=self.confirm_logout,bg="#083b68",fg="white",bd=0,padx=15,pady=8).pack(side="right"); tk.Button(top,text="My Profile",command=self.user_profile,bg="#376a92",fg="white",bd=0,padx=15,pady=8).pack(side="right",padx=5)
         body=tk.Frame(self,bg="#eef4fb"); body.pack(fill="both",expand=True,padx=20,pady=20); self.build_cards(body); notebook=ttk.Notebook(body); notebook.pack(fill="both",expand=True,pady=(18,0))
-        self.home_tab=ttk.Frame(notebook); self.notification_tab=ttk.Frame(notebook); self.resource_tab=ttk.Frame(notebook); self.reservation_tab=ttk.Frame(notebook); self.schedule_tab=ttk.Frame(notebook); self.health_tab=ttk.Frame(notebook); self.complaint_tab=ttk.Frame(notebook); self.usage_tab=ttk.Frame(notebook); self.report_tab=ttk.Frame(notebook); self.analytics_tab=ttk.Frame(notebook); self.alert_tab=ttk.Frame(notebook); self.audit_tab=ttk.Frame(notebook)
-        for tab,text in ((self.home_tab,"Dashboard"),(self.notification_tab,"Notifications"),(self.resource_tab,"Resources"),(self.reservation_tab,"Reservations"),(self.schedule_tab,"Smart Scheduling"),(self.health_tab,"Resource Health"),(self.complaint_tab,"Complaints"),(self.usage_tab,"Usage"),(self.report_tab,"Reports"),(self.analytics_tab,"Analytics"),(self.alert_tab,"Alerts"),(self.audit_tab,"Audit")):notebook.add(tab,text=f"  {text}  ")
+        self.home_tab=ttk.Frame(notebook); self.notification_tab=ttk.Frame(notebook); self.resource_tab=ttk.Frame(notebook); self.reservation_tab=ttk.Frame(notebook); self.schedule_tab=ttk.Frame(notebook); self.health_tab=ttk.Frame(notebook); self.maintenance_plan_tab=ttk.Frame(notebook); self.complaint_tab=ttk.Frame(notebook); self.usage_tab=ttk.Frame(notebook); self.report_tab=ttk.Frame(notebook); self.analytics_tab=ttk.Frame(notebook); self.alert_tab=ttk.Frame(notebook); self.audit_tab=ttk.Frame(notebook)
+        for tab,text in ((self.home_tab,"Dashboard"),(self.notification_tab,"Notifications"),(self.resource_tab,"Resources"),(self.reservation_tab,"Reservations"),(self.schedule_tab,"Smart Scheduling"),(self.health_tab,"Resource Health"),(self.maintenance_plan_tab,"Maintenance Planning"),(self.complaint_tab,"Complaints"),(self.usage_tab,"Usage"),(self.report_tab,"Reports"),(self.analytics_tab,"Analytics"),(self.alert_tab,"Alerts"),(self.audit_tab,"Audit")):notebook.add(tab,text=f"  {text}  ")
         if self.user.role=="Admin":
             self.user_tab=ttk.Frame(notebook); notebook.add(self.user_tab,text="  Users  ")
             self.admin_tab=ttk.Frame(notebook); notebook.add(self.admin_tab,text="  Admin Center  ")
             self.build_backup_controls(); self.build_admin_center()
-        self.build_professional_dashboard(self.home_tab); self.build_notifications(self.notification_tab); self.build_resources(); self.build_reservations(); self.build_smart_scheduling(); self.build_resource_health(); self.build_complaints(); self.build_usage(); self.build_reports(); self.build_analytics(); self.build_alerts(); self.build_audit()
+        self.build_professional_dashboard(self.home_tab); self.build_notifications(self.notification_tab); self.build_resources(); self.build_reservations(); self.build_smart_scheduling(); self.build_resource_health(); self.build_maintenance_planning(); self.build_complaints(); self.build_usage(); self.build_reports(); self.build_analytics(); self.build_alerts(); self.build_audit()
         if self.user.role=="Admin":self.build_users()
     def build_professional_dashboard(self,parent):
         frame=tk.Frame(parent,bg="#eef4fb"); frame.pack(fill="both",expand=True)
@@ -840,6 +840,77 @@ class SmartCampusApp(tk.Tk):
         txt=tk.Text(win,font=("Consolas",10),bg="white",fg="#345",bd=0,padx=20,pady=15); txt.pack(fill="both",expand=True,padx=20,pady=10)
         txt.insert("1.0","No elevated health risks detected." if not alerts else "\n".join("• "+x for x in alerts))
         self.audit("HEALTH_ALERT_CHECK",f"{len(alerts)} resource health alert(s)")
+
+    def build_maintenance_planning(self):
+        bar=tk.Frame(self.maintenance_plan_tab,bg="#eef4fb"); bar.pack(fill="x",padx=15,pady=12)
+        tk.Button(bar,text="Refresh Planning",command=self.refresh_maintenance_planning,bg="#0b4f8a",fg="white",bd=0,padx=14,pady=8).pack(side="left")
+        tk.Button(bar,text="+ Plan Maintenance",command=self.add_planned_maintenance,bg="#376a92",fg="white",bd=0,padx=14,pady=8).pack(side="left",padx=6)
+        tk.Button(bar,text="Cost Analytics",command=self.show_maintenance_cost_analytics,bg="#657789",fg="white",bd=0,padx=14,pady=8).pack(side="left",padx=6)
+        tk.Button(bar,text="Maintenance Calendar",command=self.show_maintenance_calendar,bg="#8a5a0b",fg="white",bd=0,padx=14,pady=8).pack(side="left",padx=6)
+        self.plan_tree=self.tree(self.maintenance_plan_tab,("maintenance_id","resource_id","date","type","cost","status","performed_by","next_due"))
+        self.refresh_maintenance_planning()
+
+    def refresh_maintenance_planning(self):
+        if not hasattr(self,"plan_tree"): return
+        for x in self.plan_tree.get_children(): self.plan_tree.delete(x)
+        rows=read_csv("maintenance.csv",MAINTENANCE_HEADERS)
+        for r in sorted(rows,key=lambda x:x.get("date","")): self.plan_tree.insert("","end",values=tuple(r.get(k,"") for k in ("maintenance_id","resource_id","date","type","cost","status","performed_by","next_due")))
+
+    def add_planned_maintenance(self):
+        resources=read_csv("resources.csv",RESOURCE_HEADERS)
+        win=tk.Toplevel(self); win.title("Plan Maintenance"); win.geometry("520x650"); win.configure(bg="white")
+        tk.Label(win,text="PLAN MAINTENANCE",font=("Segoe UI",18,"bold"),fg="#12395b",bg="white").pack(pady=20)
+        rm=tk.StringVar()
+        ttk.Combobox(win,textvariable=rm,values=[f"{r.get('resource_id')} - {r.get('name')}" for r in resources],state="readonly").pack(fill="x",padx=30,pady=8)
+        mt=tk.StringVar(value="Preventive"); ttk.Combobox(win,textvariable=mt,values=MAINTENANCE_TYPES,state="readonly").pack(fill="x",padx=30,pady=8)
+        st=tk.StringVar(value="Planned"); ttk.Combobox(win,textvariable=st,values=MAINTENANCE_STATUSES,state="readonly").pack(fill="x",padx=30,pady=8)
+        fields={}
+        for label,key,default in (("Planned Date (YYYY-MM-DD)","date",datetime.now().strftime("%Y-%m-%d")),("Estimated Cost","cost","0"),("Technician / Assigned To","performed_by",self.user.name),("Description","description",""),("Next Due (YYYY-MM-DD)","next_due","")):
+            tk.Label(win,text=label,bg="white",fg="#345",font=("Segoe UI",10,"bold")).pack(anchor="w",padx=30,pady=(8,3))
+            e=tk.Entry(win); e.pack(fill="x",padx=30,ipady=6); e.insert(0,default); fields[key]=e
+        def save():
+            selected=rm.get(); rid=selected.split(" - ",1)[0] if selected else ""
+            d=self.parse_report_date(fields["date"].get()); nxt=fields["next_due"].get().strip()
+            try: cost=float(fields["cost"].get())
+            except ValueError: messagebox.showwarning("Invalid Cost","Enter a valid estimated cost.",parent=win); return
+            if not rid or not d or cost<0 or (nxt and not self.parse_report_date(nxt)): messagebox.showwarning("Invalid Input","Check resource, planned date, cost and next-due date.",parent=win); return
+            row={"maintenance_id":self.maintenance_id(),"resource_id":rid,"date":d.strftime("%Y-%m-%d"),"type":mt.get(),"description":fields["description"].get().strip(),"cost":f"{cost:.2f}","performed_by":fields["performed_by"].get().strip(),"next_due":nxt,"status":st.get()}
+            append_csv("maintenance.csv",MAINTENANCE_HEADERS,row)
+            self.audit("MAINTENANCE_PLANNED",row["maintenance_id"]+" | "+rid+" | "+row["date"])
+            win.destroy(); self.refresh_maintenance_planning(); self.refresh_resource_health(); self.refresh_audit()
+
+        tk.Button(win,text="Save Maintenance Plan",command=save,bg="#0b4f8a",fg="white",bd=0,padx=20,pady=9).pack(pady=22)
+
+    def show_maintenance_cost_analytics(self):
+        rows=read_csv("maintenance.csv",MAINTENANCE_HEADERS)
+        costs={}
+        types={}
+        months={}
+        for r in rows:
+            try: cost=float(r.get("cost","0") or 0)
+            except ValueError: cost=0
+            rid=r.get("resource_id","Unknown"); costs[rid]=costs.get(rid,0)+cost
+            typ=r.get("type","Other"); types[typ]=types.get(typ,0)+cost
+            date=self.parse_report_date(r.get("date",""))
+            if date:
+                key=date.strftime("%Y-%m"); months[key]=months.get(key,0)+cost
+        total=sum(costs.values())
+        win=tk.Toplevel(self); win.title("Maintenance Cost Analytics"); win.geometry("900x600"); win.configure(bg="#eef4fb")
+        tk.Label(win,text="MAINTENANCE COST ANALYTICS",font=("Segoe UI",18,"bold"),fg="#12395b",bg="#eef4fb").pack(pady=15)
+        summary=tk.Text(win,font=("Consolas",11),bg="white",fg="#345",bd=0,padx=20,pady=15,height=14); summary.pack(fill="both",expand=True,padx=20,pady=10)
+        lines=["TOTAL MAINTENANCE COST",f"{total:.2f}","","RESOURCE-WISE COST"]
+        lines += [f"{k}: {v:.2f}" for k,v in sorted(costs.items(),key=lambda x:x[1],reverse=True)]
+        lines += ["","TYPE-WISE COST"]+[f"{k}: {v:.2f}" for k,v in sorted(types.items(),key=lambda x:x[1],reverse=True)]
+        lines += ["","MONTHLY COST TREND"]+[f"{k}: {v:.2f}" for k,v in sorted(months.items())]
+        summary.insert("1.0","\n".join(lines)); self.audit("MAINTENANCE_COST_ANALYTICS",f"Total cost {total:.2f}")
+
+    def show_maintenance_calendar(self):
+        rows=read_csv("maintenance.csv",MAINTENANCE_HEADERS); win=tk.Toplevel(self); win.title("Maintenance Calendar"); win.geometry("900x500"); win.configure(bg="#eef4fb")
+        tk.Label(win,text="MAINTENANCE CALENDAR",font=("Segoe UI",17,"bold"),fg="#12395b",bg="#eef4fb").pack(pady=15)
+        tree=self.tree(win,("date","resource_id","type","status","cost","assigned_to"))
+        for r in sorted(rows,key=lambda x:x.get("date","")):
+            tree.insert("","end",values=(r.get("date",""),r.get("resource_id",""),r.get("type",""),r.get("status",""),r.get("cost",""),r.get("performed_by","")))
+        self.audit("MAINTENANCE_CALENDAR_VIEWED",f"{len(rows)} record(s)")
 
     def build_complaints(self):
         bar=tk.Frame(self.complaint_tab);bar.pack(fill="x",padx=15,pady=12);tk.Button(bar,text="+ New Complaint",command=self.add_complaint,bg="#0b4f8a",fg="white",bd=0,padx=15,pady=8).pack(side="left");tk.Button(bar,text="Refresh",command=self.refresh_complaints,padx=15,pady=7).pack(side="left",padx=8)
