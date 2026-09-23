@@ -1510,7 +1510,8 @@ class SmartCampusApp(tk.Tk):
         txt=tk.Text(win,font=("Consolas",10),bg="white",fg="#12395b",padx=20,pady=20); txt.pack(fill="both",expand=True,padx=20,pady=20)
         txt.insert("1.0",self.v41_text.get("1.0","end"))
         self.audit("FINAL_V41_50_REPORT","Generated final evolution report")
-\n    def build_complaints(self):
+
+    def build_complaints(self):
         bar=tk.Frame(self.complaint_tab);bar.pack(fill="x",padx=15,pady=12);tk.Button(bar,text="+ New Complaint",command=self.add_complaint,bg="#0b4f8a",fg="white",bd=0,padx=15,pady=8).pack(side="left");tk.Button(bar,text="Refresh",command=self.refresh_complaints,padx=15,pady=7).pack(side="left",padx=8)
         if self.user.role in ("Admin","Faculty"):tk.Button(bar,text="Update Selected",command=self.update_complaint,bg="#376a92",fg="white",bd=0,padx=12,pady=7).pack(side="left",padx=5)
         tk.Label(bar,text="Search:",font=("Segoe UI",10,"bold")).pack(side="left",padx=(12,4));self.complaint_search=tk.StringVar();tk.Entry(bar,textvariable=self.complaint_search,width=22).pack(side="left",ipady=5);self.complaint_search.trace_add("write",lambda *a:self.refresh_complaints());self.complaint_tree=self.tree(self.complaint_tab,("complaint_id","resource_id","title","category","priority","status","reported_by"));self.refresh_complaints()
