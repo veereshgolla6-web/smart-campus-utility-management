@@ -163,13 +163,13 @@ class SmartCampusApp(tk.Tk):
     def show_dashboard(self):
         self.clear(); top=tk.Frame(self,bg="#0b4f8a",height=76); top.pack(fill="x"); tk.Label(top,text="Smart Campus Utility Management",font=("Segoe UI",20,"bold"),fg="white",bg="#0b4f8a").pack(side="left",padx=25,pady=18); tk.Label(top,text=f"{self.user.name}  •  {self.user.role}  •  Login: {self.session_started.strftime("%H:%M") if self.session_started else ""}",font=("Segoe UI",10),fg="white",bg="#0b4f8a").pack(side="right",padx=15); tk.Button(top,text="Logout",command=self.confirm_logout,bg="#083b68",fg="white",bd=0,padx=15,pady=8).pack(side="right"); tk.Button(top,text="My Profile",command=self.user_profile,bg="#376a92",fg="white",bd=0,padx=15,pady=8).pack(side="right",padx=5)
         body=tk.Frame(self,bg="#eef4fb"); body.pack(fill="both",expand=True,padx=20,pady=20); self.build_cards(body); notebook=ttk.Notebook(body); notebook.pack(fill="both",expand=True,pady=(18,0))
-        self.home_tab=ttk.Frame(notebook); self.notification_tab=ttk.Frame(notebook); self.resource_tab=ttk.Frame(notebook); self.reservation_tab=ttk.Frame(notebook); self.schedule_tab=ttk.Frame(notebook); self.health_tab=ttk.Frame(notebook); self.maintenance_plan_tab=ttk.Frame(notebook); self.prediction_tab=ttk.Frame(notebook); self.optimization_tab=ttk.Frame(notebook); self.forecast_tab=ttk.Frame(notebook); self.complaint_tab=ttk.Frame(notebook); self.usage_tab=ttk.Frame(notebook); self.report_tab=ttk.Frame(notebook); self.analytics_tab=ttk.Frame(notebook); self.alert_tab=ttk.Frame(notebook); self.audit_tab=ttk.Frame(notebook)
-        for tab,text in ((self.home_tab,"Dashboard"),(self.notification_tab,"Notifications"),(self.resource_tab,"Resources"),(self.reservation_tab,"Reservations"),(self.schedule_tab,"Smart Scheduling"),(self.health_tab,"Resource Health"),(self.maintenance_plan_tab,"Maintenance Planning"),(self.prediction_tab,"Predictive Maintenance"),(self.optimization_tab,"AI Resource Optimization"),(self.forecast_tab,"Demand Forecasting"),(self.complaint_tab,"Complaints"),(self.usage_tab,"Usage"),(self.report_tab,"Reports"),(self.analytics_tab,"Analytics"),(self.alert_tab,"Alerts"),(self.audit_tab,"Audit")):notebook.add(tab,text=f"  {text}  ")
+        self.home_tab=ttk.Frame(notebook); self.notification_tab=ttk.Frame(notebook); self.resource_tab=ttk.Frame(notebook); self.reservation_tab=ttk.Frame(notebook); self.schedule_tab=ttk.Frame(notebook); self.health_tab=ttk.Frame(notebook); self.maintenance_plan_tab=ttk.Frame(notebook); self.prediction_tab=ttk.Frame(notebook); self.optimization_tab=ttk.Frame(notebook); self.forecast_tab=ttk.Frame(notebook); self.executive_tab=ttk.Frame(notebook); self.complaint_tab=ttk.Frame(notebook); self.usage_tab=ttk.Frame(notebook); self.report_tab=ttk.Frame(notebook); self.analytics_tab=ttk.Frame(notebook); self.alert_tab=ttk.Frame(notebook); self.audit_tab=ttk.Frame(notebook)
+        for tab,text in ((self.home_tab,"Dashboard"),(self.notification_tab,"Notifications"),(self.resource_tab,"Resources"),(self.reservation_tab,"Reservations"),(self.schedule_tab,"Smart Scheduling"),(self.health_tab,"Resource Health"),(self.maintenance_plan_tab,"Maintenance Planning"),(self.prediction_tab,"Predictive Maintenance"),(self.optimization_tab,"AI Resource Optimization"),(self.forecast_tab,"Demand Forecasting"),(self.executive_tab,"Executive AI Dashboard"),(self.complaint_tab,"Complaints"),(self.usage_tab,"Usage"),(self.report_tab,"Reports"),(self.analytics_tab,"Analytics"),(self.alert_tab,"Alerts"),(self.audit_tab,"Audit")):notebook.add(tab,text=f"  {text}  ")
         if self.user.role=="Admin":
             self.user_tab=ttk.Frame(notebook); notebook.add(self.user_tab,text="  Users  ")
             self.admin_tab=ttk.Frame(notebook); notebook.add(self.admin_tab,text="  Admin Center  ")
             self.build_backup_controls(); self.build_admin_center()
-        self.build_professional_dashboard(self.home_tab); self.build_notifications(self.notification_tab); self.build_resources(); self.build_reservations(); self.build_smart_scheduling(); self.build_resource_health(); self.build_maintenance_planning(); self.build_predictive_maintenance(); self.build_resource_optimization(); self.build_demand_forecasting(); self.build_complaints(); self.build_usage(); self.build_reports(); self.build_analytics(); self.build_alerts(); self.build_audit()
+        self.build_professional_dashboard(self.home_tab); self.build_notifications(self.notification_tab); self.build_resources(); self.build_reservations(); self.build_smart_scheduling(); self.build_resource_health(); self.build_maintenance_planning(); self.build_predictive_maintenance(); self.build_resource_optimization(); self.build_demand_forecasting(); self.build_executive_dashboard(); self.build_complaints(); self.build_usage(); self.build_reports(); self.build_analytics(); self.build_alerts(); self.build_audit()
         if self.user.role=="Admin":self.build_users()
     def build_professional_dashboard(self,parent):
         frame=tk.Frame(parent,bg="#eef4fb"); frame.pack(fill="both",expand=True)
@@ -1155,6 +1155,84 @@ class SmartCampusApp(tk.Tk):
         txt=tk.Text(win,font=("Consolas",10),bg="white",fg="#345",bd=0,padx=20,pady=15); txt.pack(fill="both",expand=True,padx=20,pady=10)
         txt.insert("1.0","No major planning recommendations." if not lines else "\n".join("• "+x for x in lines))
         self.audit("CAMPUS_PLANNING_RECOMMENDATIONS","Generated demand planning recommendations")
+
+    def executive_intelligence(self):
+        resources=read_csv("resources.csv",RESOURCE_HEADERS); complaints=read_csv("complaints.csv",COMPLAINT_HEADERS); usage=read_csv("usage.csv",USAGE_HEADERS); maintenance=read_csv("maintenance.csv",MAINTENANCE_HEADERS); reservations=read_csv("reservations.csv",RESERVATION_HEADERS)
+        open_complaints=sum(1 for c in complaints if c.get("status") not in ("Resolved","Closed"))
+        critical_complaints=sum(1 for c in complaints if c.get("priority") in ("High","Critical") and c.get("status") not in ("Resolved","Closed"))
+        health=[self.resource_health_score(r.get("resource_id",""))[0] for r in resources]
+        avg_health=sum(health)/len(health) if health else 0
+        total_cost=0
+        for m in maintenance:
+            try: total_cost+=float(m.get("cost","0") or 0)
+            except ValueError: pass
+        metrics=self.resource_optimization_metrics()
+        avg_util=sum(m["utilization"] for m in metrics)/len(metrics) if metrics else 0
+        alerts=critical_complaints+sum(1 for r in resources if r.get("status")=="Out of Service")
+        return {"resources":len(resources),"available":sum(r.get("status")=="Available" for r in resources),"open_complaints":open_complaints,"critical_complaints":critical_complaints,"avg_health":avg_health,"maintenance_cost":total_cost,"avg_utilization":avg_util,"alerts":alerts,"reservations":len(reservations),"usage":len(usage)}
+
+    def build_executive_dashboard(self):
+        bar=tk.Frame(self.executive_tab,bg="#eef4fb"); bar.pack(fill="x",padx=15,pady=12)
+        tk.Button(bar,text="Refresh Executive AI",command=self.refresh_executive_dashboard,bg="#0b4f8a",fg="white",bd=0,padx=14,pady=8).pack(side="left")
+        tk.Button(bar,text="Priority Action Center",command=self.show_priority_actions,bg="#8a5a0b",fg="white",bd=0,padx=14,pady=8).pack(side="left",padx=6)
+        tk.Button(bar,text="Executive Report",command=self.show_executive_report,bg="#376a92",fg="white",bd=0,padx=14,pady=8).pack(side="left",padx=6)
+        self.exec_text=tk.Text(self.executive_tab,font=("Consolas",10),bg="white",fg="#12395b",bd=0,padx=20,pady=15)
+        self.exec_text.pack(fill="both",expand=True,padx=15,pady=10)
+        self.refresh_executive_dashboard()
+
+    def refresh_executive_dashboard(self):
+        if not hasattr(self,"exec_text"): return
+        x=self.executive_intelligence()
+        monthly,avg,trend,forecast=self.demand_forecast_metrics()
+        lines=["INTELLIGENT CAMPUS EXECUTIVE DASHBOARD","="*72,"",
+               "EXECUTIVE KPIs","-"*72,
+               f"Resources: {x['resources']} | Available: {x['available']}",
+               f"Average Resource Health: {x['avg_health']:.1f}/100",
+               f"Average Utilization: {x['avg_utilization']:.1f}%",
+               f"Open Complaints: {x['open_complaints']} | High/Critical Open: {x['critical_complaints']}",
+               f"Maintenance Cost: {x['maintenance_cost']:.2f}",
+               f"Reservations: {x['reservations']} | Usage Records: {x['usage']}",
+               f"Priority Alerts: {x['alerts']}","","DEMAND INTELLIGENCE","-"*72,
+               f"Recent Demand Trend: {trend:+.1f}%",
+               f"Baseline Monthly Demand: {avg:.1f} hours",
+               f"Next Forecast Point: {forecast[0][1]:.1f} hours" if forecast else "Next Forecast Point: N/A",
+               "","DECISION SUPPORT","-"*72]
+        if x["critical_complaints"]: lines.append("• Resolve high/critical complaints and inspect affected resources.")
+        if x["avg_health"]<75: lines.append("• Review resources with lower health scores and prioritize preventive maintenance.")
+        if x["avg_utilization"]>70: lines.append("• Review capacity expansion/sharing for heavily utilized resources.")
+        elif x["avg_utilization"]<20: lines.append("• Review under-utilized resources for sharing or reassignment.")
+        if trend>15: lines.append("• Demand trend is rising; review upcoming capacity and procurement plans.")
+        elif trend<-15: lines.append("• Demand trend is declining; review excess capacity.")
+        if not any(lines[-len(lines):]): pass
+        if len(lines)<20: lines.append("• Current indicators do not require a major action based on configured thresholds.")
+        self.exec_text.delete("1.0","end"); self.exec_text.insert("1.0","\n".join(lines))
+
+    def show_priority_actions(self):
+        x=self.executive_intelligence(); actions=[]
+        for r in read_csv("resources.csv",RESOURCE_HEADERS):
+            score,reasons=self.resource_health_score(r.get("resource_id",""))
+            if score<50: actions.append(f"HIGH: {r.get('resource_id')} - {r.get('name')} health {score}/100")
+        for c in read_csv("complaints.csv",COMPLAINT_HEADERS):
+            if c.get("priority") in ("High","Critical") and c.get("status") not in ("Resolved","Closed"):
+                actions.append(f"HIGH: Complaint {c.get('complaint_id')} ({c.get('priority')})")
+        for r in read_csv("resources.csv",RESOURCE_HEADERS):
+            if r.get("status")=="Out of Service": actions.append(f"HIGH: {r.get('resource_id')} is Out of Service")
+        if not actions: actions.append("No high-priority actions detected by the configured rules.")
+        win=tk.Toplevel(self); win.title("Priority Action Center"); win.geometry("820x480"); win.configure(bg="white")
+        tk.Label(win,text="PRIORITY ACTION CENTER",font=("Segoe UI",17,"bold"),fg="#12395b",bg="white").pack(pady=15)
+        txt=tk.Text(win,font=("Consolas",10),bg="white",fg="#345",bd=0,padx=20,pady=15); txt.pack(fill="both",expand=True,padx=20,pady=10); txt.insert("1.0","\n".join("• "+a for a in actions))
+        self.audit("EXECUTIVE_PRIORITY_ACTIONS","Generated priority action center")
+
+    def show_executive_report(self):
+        x=self.executive_intelligence(); win=tk.Toplevel(self); win.title("Executive AI Report"); win.geometry("850x620"); win.configure(bg="#eef4fb")
+        tk.Label(win,text="EXECUTIVE CAMPUS INTELLIGENCE REPORT",font=("Segoe UI",17,"bold"),fg="#12395b",bg="#eef4fb").pack(pady=15)
+        txt=tk.Text(win,font=("Consolas",10),bg="white",fg="#345",bd=0,padx=20,pady=15); txt.pack(fill="both",expand=True,padx=20,pady=10)
+        report=["EXECUTIVE SUMMARY","="*65]
+        for k,v in x.items(): report.append(f"{k.replace('_',' ').title()}: {v:.1f}" if isinstance(v,float) else f"{k.replace('_',' ').title()}: {v}")
+        monthly,avg,trend,forecast=self.demand_forecast_metrics()
+        report += ["","Demand Trend: "+f"{trend:+.1f}%","Baseline Demand: "+f"{avg:.1f} hours/month"]
+        report += ["Forecast:"]+[f"{d.strftime('%Y-%m-%d')} -> {v:.1f} hours" for d,v in forecast]
+        txt.insert("1.0","\n".join(report)); self.audit("EXECUTIVE_REPORT_VIEWED","Viewed executive intelligence report")
 
     def build_complaints(self):
         bar=tk.Frame(self.complaint_tab);bar.pack(fill="x",padx=15,pady=12);tk.Button(bar,text="+ New Complaint",command=self.add_complaint,bg="#0b4f8a",fg="white",bd=0,padx=15,pady=8).pack(side="left");tk.Button(bar,text="Refresh",command=self.refresh_complaints,padx=15,pady=7).pack(side="left",padx=8)
