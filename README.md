@@ -112,3 +112,17 @@ Version 20 adds a dedicated reservation and availability workflow:
 - Reservation notifications and audit events
 - Reservations included in backup and restore data
 - New reservation data file: `data/reservations.csv`
+
+
+## Version 21 — Resource Utilization & Smart Scheduling
+
+Version 21 adds:
+- Resource utilization percentage for today/next 7 days
+- Most-used and least-used resource tracking
+- Daily/weekly resource schedule calendar
+- Scheduling conflict detection
+- Smart free-slot recommendations using 30-minute scheduling intervals
+- Department-wise reservation utilization
+- Operating-hours based utilization calculation
+- Overbooking prevention through reservation conflict validation
+- Dedicated Smart Scheduling dashboard
