@@ -242,3 +242,21 @@ Version 28 adds:
 - Quick-action question buttons
 - Conversational query history
 - Audit logging for Command Center queries
+
+
+## Version 29 — JARVIS AI Automation Engine & Proactive Campus Intelligence
+
+Version 29 adds:
+- JARVIS proactive campus intelligence engine
+- Automated cross-module condition scanning
+- Resource out-of-service detection
+- Resource health-risk detection
+- Overdue and upcoming maintenance detection
+- High/Critical unresolved complaint detection
+- High-utilization capacity alerts
+- Rising-demand alerts
+- Automatic JARVIS notification generation with duplicate prevention
+- JARVIS Automation Center
+- Daily campus intelligence summary
+- Priority action detection
+- Audit logging for automation scans and summaries
