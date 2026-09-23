@@ -206,3 +206,19 @@ Version 26 adds:
 - Procurement and capacity planning guidance
 - Forecast refresh dashboard
 - AI-style campus planning recommendations
+
+
+## Version 27 — Intelligent Campus Decision Support & Executive AI Dashboard
+
+Version 27 adds:
+- Unified executive campus intelligence dashboard
+- Executive KPI summary
+- Average resource health overview
+- Resource utilization intelligence
+- Maintenance cost intelligence
+- Complaint and priority-risk monitoring
+- Reservation and usage activity summary
+- Demand forecast integration
+- Priority Action Center
+- Executive intelligence report
+- Cross-module decision support combining resources, reservations, usage, maintenance, complaints and forecasting
