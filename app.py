@@ -85,7 +85,8 @@ class SmartCampusApp(tk.Tk):
         for tab,text in ((self.resource_tab,"Resources"),(self.complaint_tab,"Complaints"),(self.usage_tab,"Usage"),(self.report_tab,"Reports"),(self.analytics_tab,"Analytics"),(self.alert_tab,"Alerts"),(self.audit_tab,"Audit")):notebook.add(tab,text=f"  {text}  ")
         if self.user.role=="Admin":
             self.user_tab=ttk.Frame(notebook); notebook.add(self.user_tab,text="  Users  ")
-            self.build_backup_controls()
+            self.admin_tab=ttk.Frame(notebook); notebook.add(self.admin_tab,text="  Admin Center  ")
+            self.build_backup_controls(); self.build_admin_center()
         self.build_resources(); self.build_complaints(); self.build_usage(); self.build_reports(); self.build_analytics(); self.build_alerts(); self.build_audit()
         if self.user.role=="Admin":self.build_users()
     def build_cards(self,parent):
@@ -99,6 +100,34 @@ class SmartCampusApp(tk.Tk):
         t=ttk.Treeview(parent,columns=columns,show="headings")
         for c in columns:t.heading(c,text=c.replace("_"," ").title()); t.column(c,width=135,anchor="center")
         t.pack(fill="both",expand=True,padx=15,pady=10); return t
+    def build_admin_center(self):
+        bar=tk.Frame(self.admin_tab); bar.pack(fill="x",padx=15,pady=12)
+        tk.Button(bar,text="Refresh System Health",command=self.refresh_admin_center,bg="#0b4f8a",fg="white",bd=0,padx=15,pady=8).pack(side="left")
+        tk.Button(bar,text="Change My Password",command=self.change_password,bg="#376a92",fg="white",bd=0,padx=15,pady=8).pack(side="left",padx=8)
+        self.admin_text=tk.Text(self.admin_tab,font=("Consolas",11),bg="white",fg="#12395b",bd=0,padx=20,pady=20); self.admin_text.pack(fill="both",expand=True,padx=15,pady=10); self.refresh_admin_center()
+
+    def refresh_admin_center(self):
+        users=read_csv("users.csv",USER_HEADERS); resources=read_csv("resources.csv",RESOURCE_HEADERS); complaints=read_csv("complaints.csv",COMPLAINT_HEADERS); usage=read_csv("usage.csv",USAGE_HEADERS); audits=read_csv("audit.csv",AUDIT_HEADERS)
+        backup_count=len([p for p in Path("backups").iterdir() if p.is_dir()]) if Path("backups").exists() else 0
+        lines=["ADMIN CONTROL CENTER","="*60,"","SYSTEM HEALTH","-"*60,f"Users: {len(users)}",f"Resources: {len(resources)}",f"Complaints: {len(complaints)}",f"Usage records: {len(usage)}",f"Audit entries: {len(audits)}",f"Backups: {backup_count}","","USER ACTIVITY","-"*60]
+        for row in reversed(audits[-15:]): lines.append(f"{row.get('timestamp','')} | {row.get('username','')} | {row.get('action','')} | {row.get('details','')}")
+        self.admin_text.delete("1.0","end"); self.admin_text.insert("1.0","\n".join(lines))
+
+    def change_password(self):
+        win=tk.Toplevel(self); win.title("Change Password"); win.geometry("420x330"); win.configure(bg="white"); fields={}
+        for label,key in (("Current Password","current"),("New Password","new"),("Confirm New Password","confirm")):
+            tk.Label(win,text=label,bg="white",fg="#345",font=("Segoe UI",10,"bold")).pack(anchor="w",padx=30,pady=(18,3)); e=tk.Entry(win,show="*",font=("Segoe UI",11)); e.pack(fill="x",padx=30,ipady=7); fields[key]=e
+        def save():
+            cur=fields["current"].get(); new=fields["new"].get(); confirm=fields["confirm"].get()
+            if cur!=self.user.password: messagebox.showerror("Invalid Password","Current password is incorrect.",parent=win); return
+            if len(new)<6: messagebox.showwarning("Weak Password","New password must contain at least 6 characters.",parent=win); return
+            if new!=confirm: messagebox.showwarning("Mismatch","New passwords do not match.",parent=win); return
+            rows=read_csv("users.csv",USER_HEADERS)
+            for row in rows:
+                if row.get("username")==self.user.username: row["password"]=new
+            rewrite_csv("users.csv",USER_HEADERS,rows); self.user.password=new; self.audit("PASSWORD_CHANGED","User changed own password"); win.destroy(); self.refresh_audit(); self.refresh_admin_center() if self.user.role=="Admin" else None; messagebox.showinfo("Password Updated","Your password was changed successfully.")
+        tk.Button(win,text="Update Password",command=save,bg="#0b4f8a",fg="white",bd=0,padx=20,pady=9).pack(pady=25)
+
     def build_backup_controls(self):
         bar=tk.Frame(self.user_tab); bar.pack(fill="x",padx=15,pady=(0,12))
         tk.Button(bar,text="Create Backup",command=self.backup_data,bg="#0b4f8a",fg="white",bd=0,padx=15,pady=8).pack(side="left")
