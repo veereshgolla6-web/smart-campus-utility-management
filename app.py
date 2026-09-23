@@ -163,13 +163,13 @@ class SmartCampusApp(tk.Tk):
     def show_dashboard(self):
         self.clear(); top=tk.Frame(self,bg="#0b4f8a",height=76); top.pack(fill="x"); tk.Label(top,text="Smart Campus Utility Management",font=("Segoe UI",20,"bold"),fg="white",bg="#0b4f8a").pack(side="left",padx=25,pady=18); tk.Label(top,text=f"{self.user.name}  •  {self.user.role}  •  Login: {self.session_started.strftime("%H:%M") if self.session_started else ""}",font=("Segoe UI",10),fg="white",bg="#0b4f8a").pack(side="right",padx=15); tk.Button(top,text="Logout",command=self.confirm_logout,bg="#083b68",fg="white",bd=0,padx=15,pady=8).pack(side="right"); tk.Button(top,text="My Profile",command=self.user_profile,bg="#376a92",fg="white",bd=0,padx=15,pady=8).pack(side="right",padx=5)
         body=tk.Frame(self,bg="#eef4fb"); body.pack(fill="both",expand=True,padx=20,pady=20); self.build_cards(body); notebook=ttk.Notebook(body); notebook.pack(fill="both",expand=True,pady=(18,0))
-        self.home_tab=ttk.Frame(notebook); self.notification_tab=ttk.Frame(notebook); self.resource_tab=ttk.Frame(notebook); self.reservation_tab=ttk.Frame(notebook); self.schedule_tab=ttk.Frame(notebook); self.health_tab=ttk.Frame(notebook); self.maintenance_plan_tab=ttk.Frame(notebook); self.prediction_tab=ttk.Frame(notebook); self.optimization_tab=ttk.Frame(notebook); self.complaint_tab=ttk.Frame(notebook); self.usage_tab=ttk.Frame(notebook); self.report_tab=ttk.Frame(notebook); self.analytics_tab=ttk.Frame(notebook); self.alert_tab=ttk.Frame(notebook); self.audit_tab=ttk.Frame(notebook)
-        for tab,text in ((self.home_tab,"Dashboard"),(self.notification_tab,"Notifications"),(self.resource_tab,"Resources"),(self.reservation_tab,"Reservations"),(self.schedule_tab,"Smart Scheduling"),(self.health_tab,"Resource Health"),(self.maintenance_plan_tab,"Maintenance Planning"),(self.prediction_tab,"Predictive Maintenance"),(self.optimization_tab,"AI Resource Optimization"),(self.complaint_tab,"Complaints"),(self.usage_tab,"Usage"),(self.report_tab,"Reports"),(self.analytics_tab,"Analytics"),(self.alert_tab,"Alerts"),(self.audit_tab,"Audit")):notebook.add(tab,text=f"  {text}  ")
+        self.home_tab=ttk.Frame(notebook); self.notification_tab=ttk.Frame(notebook); self.resource_tab=ttk.Frame(notebook); self.reservation_tab=ttk.Frame(notebook); self.schedule_tab=ttk.Frame(notebook); self.health_tab=ttk.Frame(notebook); self.maintenance_plan_tab=ttk.Frame(notebook); self.prediction_tab=ttk.Frame(notebook); self.optimization_tab=ttk.Frame(notebook); self.forecast_tab=ttk.Frame(notebook); self.complaint_tab=ttk.Frame(notebook); self.usage_tab=ttk.Frame(notebook); self.report_tab=ttk.Frame(notebook); self.analytics_tab=ttk.Frame(notebook); self.alert_tab=ttk.Frame(notebook); self.audit_tab=ttk.Frame(notebook)
+        for tab,text in ((self.home_tab,"Dashboard"),(self.notification_tab,"Notifications"),(self.resource_tab,"Resources"),(self.reservation_tab,"Reservations"),(self.schedule_tab,"Smart Scheduling"),(self.health_tab,"Resource Health"),(self.maintenance_plan_tab,"Maintenance Planning"),(self.prediction_tab,"Predictive Maintenance"),(self.optimization_tab,"AI Resource Optimization"),(self.forecast_tab,"Demand Forecasting"),(self.complaint_tab,"Complaints"),(self.usage_tab,"Usage"),(self.report_tab,"Reports"),(self.analytics_tab,"Analytics"),(self.alert_tab,"Alerts"),(self.audit_tab,"Audit")):notebook.add(tab,text=f"  {text}  ")
         if self.user.role=="Admin":
             self.user_tab=ttk.Frame(notebook); notebook.add(self.user_tab,text="  Users  ")
             self.admin_tab=ttk.Frame(notebook); notebook.add(self.admin_tab,text="  Admin Center  ")
             self.build_backup_controls(); self.build_admin_center()
-        self.build_professional_dashboard(self.home_tab); self.build_notifications(self.notification_tab); self.build_resources(); self.build_reservations(); self.build_smart_scheduling(); self.build_resource_health(); self.build_maintenance_planning(); self.build_predictive_maintenance(); self.build_resource_optimization(); self.build_complaints(); self.build_usage(); self.build_reports(); self.build_analytics(); self.build_alerts(); self.build_audit()
+        self.build_professional_dashboard(self.home_tab); self.build_notifications(self.notification_tab); self.build_resources(); self.build_reservations(); self.build_smart_scheduling(); self.build_resource_health(); self.build_maintenance_planning(); self.build_predictive_maintenance(); self.build_resource_optimization(); self.build_demand_forecasting(); self.build_complaints(); self.build_usage(); self.build_reports(); self.build_analytics(); self.build_alerts(); self.build_audit()
         if self.user.role=="Admin":self.build_users()
     def build_professional_dashboard(self,parent):
         frame=tk.Frame(parent,bg="#eef4fb"); frame.pack(fill="both",expand=True)
@@ -1071,6 +1071,90 @@ class SmartCampusApp(tk.Tk):
         tk.Label(win,text=f"{score:.1f}/100",font=("Segoe UI",34,"bold"),fg="#0b4f8a",bg="white").pack(pady=15)
         tk.Label(win,text="Based on the last 30 days of recorded usage and active/pending reservations.",bg="white",fg="#60758a",wraplength=500).pack(pady=10)
         self.audit("RESOURCE_EFFICIENCY_SCORE",f"{score:.1f}/100")
+
+    def demand_forecast_metrics(self):
+        usage=read_csv("usage.csv",USAGE_HEADERS); reservations=read_csv("reservations.csv",RESERVATION_HEADERS)
+        today=datetime.now().date(); monthly={}
+        for row in usage:
+            d=self.parse_report_date(row.get("date",""))
+            if not d: continue
+            key=d.strftime("%Y-%m")
+            try: monthly[key]=monthly.get(key,0)+float(row.get("duration","0") or 0)
+            except ValueError: pass
+        for row in reservations:
+            if row.get("status") in ("Cancelled","Completed"): continue
+            d=self.parse_report_date(row.get("date",""))
+            if not d: continue
+            key=d.strftime("%Y-%m")
+            try:
+                st=datetime.strptime(row.get("start_time",""),"%H:%M"); en=datetime.strptime(row.get("end_time",""),"%H:%M")
+                monthly[key]=monthly.get(key,0)+max(0,(en-st).seconds/3600)
+            except ValueError: pass
+        values=list(monthly.items())[-6:]
+        avg=sum(v for _,v in values)/len(values) if values else 0
+        if len(values)>=2:
+            recent=values[-1][1]; previous=values[-2][1]; trend=((recent-previous)/previous*100) if previous else (100 if recent else 0)
+        else: trend=0
+        forecast=[(today+timedelta(days=7*i),avg*(1+(trend/100)*min(i,4)*0.25)) for i in range(1,5)]
+        return monthly,avg,trend,forecast
+
+    def build_demand_forecasting(self):
+        bar=tk.Frame(self.forecast_tab,bg="#eef4fb"); bar.pack(fill="x",padx=15,pady=12)
+        tk.Button(bar,text="Refresh Forecast",command=self.refresh_demand_forecasting,bg="#0b4f8a",fg="white",bd=0,padx=14,pady=8).pack(side="left")
+        tk.Button(bar,text="Peak Demand",command=self.show_peak_demand,bg="#376a92",fg="white",bd=0,padx=14,pady=8).pack(side="left",padx=6)
+        tk.Button(bar,text="Capacity Warnings",command=self.show_capacity_warnings,bg="#8a5a0b",fg="white",bd=0,padx=14,pady=8).pack(side="left",padx=6)
+        tk.Button(bar,text="Planning Recommendations",command=self.show_planning_recommendations,bg="#657789",fg="white",bd=0,padx=14,pady=8).pack(side="left",padx=6)
+        self.forecast_text=tk.Text(self.forecast_tab,font=("Consolas",10),bg="white",fg="#12395b",bd=0,padx=20,pady=15)
+        self.forecast_text.pack(fill="both",expand=True,padx=15,pady=10)
+        self.refresh_demand_forecasting()
+
+    def refresh_demand_forecasting(self):
+        if not hasattr(self,"forecast_text"): return
+        monthly,avg,trend,forecast=self.demand_forecast_metrics()
+        lines=["AI-STYLE DEMAND FORECAST","="*65,"","HISTORICAL MONTHLY DEMAND (USAGE + ACTIVE/PENDING RESERVATIONS)"]
+        lines += [f"{k}: {v:.1f} hours" for k,v in sorted(monthly.items())[-6:]]
+        lines += ["",f"BASELINE AVERAGE: {avg:.1f} hours/month",f"RECENT TREND: {trend:+.1f}%","",
+                  "NEXT 4 FORECAST POINTS"]
+        lines += [f"{d.strftime('%Y-%m-%d')}: {v:.1f} demand-hours" for d,v in forecast]
+        self.forecast_text.delete("1.0","end"); self.forecast_text.insert("1.0","\n".join(lines))
+
+    def show_peak_demand(self):
+        metrics=self.resource_optimization_metrics()
+        ranked=sorted(metrics,key=lambda m:m["usage_hours"]+m["reservation_hours"],reverse=True)
+        win=tk.Toplevel(self); win.title("Peak Demand Analysis"); win.geometry("850x500"); win.configure(bg="#eef4fb")
+        tk.Label(win,text="PEAK RESOURCE DEMAND",font=("Segoe UI",17,"bold"),fg="#12395b",bg="#eef4fb").pack(pady=15)
+        tree=self.tree(win,("resource_id","name","department","utilization","demand","total_hours"))
+        for m in ranked:
+            total=m["usage_hours"]+m["reservation_hours"]
+            tree.insert("","end",values=(m["resource_id"],m["name"],m["department"],f'{m["utilization"]:.1f}%',m["demand"],f"{total:.1f}"))
+        self.audit("PEAK_DEMAND_ANALYSIS","Viewed peak resource demand")
+
+    def show_capacity_warnings(self):
+        metrics=self.resource_optimization_metrics(); warnings=[]
+        for m in metrics:
+            if m["utilization"]>80 or m["demand"]=="High":
+                warnings.append(f'{m["resource_id"]} - {m["name"]}: {m["utilization"]:.1f}% utilization; consider additional capacity.')
+        win=tk.Toplevel(self); win.title("Future Capacity Warnings"); win.geometry("800x450"); win.configure(bg="white")
+        tk.Label(win,text="FUTURE CAPACITY WARNINGS",font=("Segoe UI",16,"bold"),fg="#12395b",bg="white").pack(pady=15)
+        txt=tk.Text(win,font=("Consolas",10),bg="white",fg="#345",bd=0,padx=20,pady=15); txt.pack(fill="both",expand=True,padx=20,pady=10)
+        txt.insert("1.0","No capacity warnings." if not warnings else "\n".join("• "+x for x in warnings))
+        self.audit("CAPACITY_WARNING_CHECK",f"{len(warnings)} warning(s)")
+
+    def show_planning_recommendations(self):
+        metrics=self.resource_optimization_metrics(); lines=[]
+        for m in metrics:
+            if m["utilization"]>80:
+                lines.append(f'{m["resource_id"]} - {m["name"]}: high demand; plan extra/shared capacity.')
+            elif m["utilization"]<15:
+                lines.append(f'{m["resource_id"]} - {m["name"]}: low demand; consider consolidation or reassignment.')
+        monthly,avg,trend,forecast=self.demand_forecast_metrics()
+        if trend>15: lines.append(f"Overall demand trend is rising ({trend:.1f}%); review procurement and capacity plans.")
+        elif trend<-15: lines.append(f"Overall demand trend is declining ({trend:.1f}%); review under-utilized capacity.")
+        win=tk.Toplevel(self); win.title("AI Planning Recommendations"); win.geometry("850x500"); win.configure(bg="white")
+        tk.Label(win,text="AI-STYLE CAMPUS PLANNING RECOMMENDATIONS",font=("Segoe UI",16,"bold"),fg="#12395b",bg="white").pack(pady=15)
+        txt=tk.Text(win,font=("Consolas",10),bg="white",fg="#345",bd=0,padx=20,pady=15); txt.pack(fill="both",expand=True,padx=20,pady=10)
+        txt.insert("1.0","No major planning recommendations." if not lines else "\n".join("• "+x for x in lines))
+        self.audit("CAMPUS_PLANNING_RECOMMENDATIONS","Generated demand planning recommendations")
 
     def build_complaints(self):
         bar=tk.Frame(self.complaint_tab);bar.pack(fill="x",padx=15,pady=12);tk.Button(bar,text="+ New Complaint",command=self.add_complaint,bg="#0b4f8a",fg="white",bd=0,padx=15,pady=8).pack(side="left");tk.Button(bar,text="Refresh",command=self.refresh_complaints,padx=15,pady=7).pack(side="left",padx=8)
