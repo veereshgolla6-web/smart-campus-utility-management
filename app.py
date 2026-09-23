@@ -386,6 +386,60 @@ class SmartCampusApp(tk.Tk):
         for r in rows:
             if r.get("resource_id")==rid and r.get("status")=="In Use":r["status"]="Available"
         rewrite_csv("resources.csv",RESOURCE_HEADERS,rows);self.audit("RESOURCE_RELEASED",rid);self.refresh_resources();self.refresh_alerts();self.refresh_analytics();self.refresh_audit();messagebox.showinfo("Resource Released",f"{rid} is now Available.")
+    def parse_report_date(self,value):
+        value=(value or "").strip()
+        for fmt in ("%Y-%m-%d","%d-%m-%Y","%d/%m/%Y"):
+            try: return datetime.strptime(value,fmt).date()
+            except ValueError: pass
+        return None
+
+    def build_report_filters(self,parent):
+        box=tk.LabelFrame(parent,text="Advanced Filters",bg="white",fg="#12395b",font=("Segoe UI",10,"bold"),padx=10,pady=8)
+        box.pack(fill="x",padx=15,pady=(0,8))
+        self.report_from=tk.StringVar(); self.report_to=tk.StringVar(); self.report_resource=tk.StringVar(value="All"); self.report_status=tk.StringVar(value="All"); self.report_priority=tk.StringVar(value="All")
+        for label,var in (("From (YYYY-MM-DD)",self.report_from),("To (YYYY-MM-DD)",self.report_to)):
+            tk.Label(box,text=label,bg="white",fg="#456").pack(side="left",padx=(0,5))
+            tk.Entry(box,textvariable=var,width=13).pack(side="left",padx=(0,12))
+        tk.Label(box,text="Resource",bg="white",fg="#456").pack(side="left")
+        ttk.Combobox(box,textvariable=self.report_resource,values=["All"]+[r.get("resource_id","") for r in read_csv("resources.csv",RESOURCE_HEADERS)],width=14,state="readonly").pack(side="left",padx=(5,12))
+        tk.Label(box,text="Status",bg="white",fg="#456").pack(side="left")
+        ttk.Combobox(box,textvariable=self.report_status,values=["All"]+list(RESOURCE_STATUSES)+list(STATUSES),width=15,state="readonly").pack(side="left",padx=(5,12))
+        tk.Label(box,text="Priority",bg="white",fg="#456").pack(side="left")
+        ttk.Combobox(box,textvariable=self.report_priority,values=["All"]+list(PRIORITIES),width=10,state="readonly").pack(side="left",padx=(5,12))
+        tk.Button(box,text="Apply Filters",command=self.refresh_report_center,bg="#0b4f8a",fg="white",bd=0,padx=10,pady=5).pack(side="left",padx=4)
+        tk.Button(box,text="Clear Filters",command=self.clear_report_filters,bg="#6b7d8f",fg="white",bd=0,padx=10,pady=5).pack(side="left",padx=4)
+
+    def clear_report_filters(self):
+        self.report_from.set(""); self.report_to.set(""); self.report_resource.set("All"); self.report_status.set("All"); self.report_priority.set("All")
+        self.refresh_report_center()
+
+    def get_filtered_report_data(self):
+        resources=read_csv("resources.csv",RESOURCE_HEADERS); complaints=read_csv("complaints.csv",COMPLAINT_HEADERS); usage=read_csv("usage.csv",USAGE_HEADERS)
+        resource_id=self.report_resource.get() if hasattr(self,"report_resource") else "All"
+        status=self.report_status.get() if hasattr(self,"report_status") else "All"
+        priority=self.report_priority.get() if hasattr(self,"report_priority") else "All"
+        start=self.parse_report_date(self.report_from.get()) if hasattr(self,"report_from") else None
+        end=self.parse_report_date(self.report_to.get()) if hasattr(self,"report_to") else None
+        if self.report_from.get() and not start: messagebox.showwarning("Invalid Date","Use YYYY-MM-DD for the From date."); return None
+        if self.report_to.get() and not end: messagebox.showwarning("Invalid Date","Use YYYY-MM-DD for the To date."); return None
+        if start and end and start>end: messagebox.showwarning("Invalid Range","From date must not be after To date."); return None
+        if resource_id!="All":
+            resources=[r for r in resources if r.get("resource_id")==resource_id]
+            complaints=[x for x in complaints if x.get("resource_id")==resource_id]
+            usage=[x for x in usage if x.get("resource_id")==resource_id]
+        if status!="All":
+            resources=[r for r in resources if r.get("status")==status]
+            complaints=[x for x in complaints if x.get("status")==status]
+        if priority!="All": complaints=[x for x in complaints if x.get("priority")==priority]
+        if start or end:
+            def in_range(row):
+                d=self.parse_report_date(row.get("date",""))
+                if not d: return False
+                return (not start or d>=start) and (not end or d<=end)
+            usage=[x for x in usage if in_range(x)]
+            complaints=[x for x in complaints if in_range(x)]
+        return resources,complaints,usage
+
     def export_report_csv(self,filename,headers,rows):
         out=Path("reports"); out.mkdir(exist_ok=True)
         path=out/filename
@@ -395,66 +449,38 @@ class SmartCampusApp(tk.Tk):
 
     def build_reports(self):
         bar=tk.Frame(self.reports_tab,bg="#eef4fb"); bar.pack(fill="x",padx=15,pady=12)
-        tk.Button(bar,text="Export All Reports",command=self.export_all_reports,bg="#0b4f8a",fg="white",bd=0,padx=15,pady=8).pack(side="left")
+        tk.Button(bar,text="Export Filtered Reports",command=self.export_all_reports,bg="#0b4f8a",fg="white",bd=0,padx=15,pady=8).pack(side="left")
         tk.Button(bar,text="Refresh Report Center",command=self.refresh_report_center,bg="#376a92",fg="white",bd=0,padx=15,pady=8).pack(side="left",padx=8)
+        self.build_report_filters(self.reports_tab)
         self.report_text=tk.Text(self.reports_tab,font=("Consolas",10),bg="white",fg="#12395b",bd=0,padx=20,pady=15)
         self.report_text.pack(fill="both",expand=True,padx=15,pady=10)
         self.refresh_report_center()
 
     def refresh_report_center(self):
-        resources=read_csv("resources.csv",RESOURCE_HEADERS); complaints=read_csv("complaints.csv",COMPLAINT_HEADERS); usage=read_csv("usage.csv",USAGE_HEADERS)
+        data=self.get_filtered_report_data()
+        if not data: return
+        resources,complaints,usage=data
         maintenance=[r for r in resources if r.get("status")=="Maintenance"]
         open_complaints=[x for x in complaints if x.get("status") not in ("Resolved","Closed")]
-        lines=["SMART REPORTS & EXPORT CENTER","="*65,"","AVAILABLE REPORTS","-"*65,
-               f"Resource report: {len(resources)} records",f"Complaint report: {len(complaints)} records",
-               f"Usage report: {len(usage)} records",f"Maintenance report: {len(maintenance)} records",
-               f"Open complaint report: {len(open_complaints)} records","","Export folder: reports/",
-               "","Use 'Export All Reports' to generate the current reports and dashboard summary."]
+        lines=["SMART REPORTS & EXPORT CENTER","="*65,"","ACTIVE FILTERS","-"*65,
+               f"Date range: {self.report_from.get() or 'Any'} to {self.report_to.get() or 'Any'}",
+               f"Resource: {self.report_resource.get() or 'All'} | Status: {self.report_status.get() or 'All'} | Priority: {self.report_priority.get() or 'All'}",
+               "","FILTERED REPORT COUNTS","-"*65,f"Resources: {len(resources)}",f"Complaints: {len(complaints)}",f"Usage records: {len(usage)}",f"Maintenance: {len(maintenance)}",f"Open complaints: {len(open_complaints)}","","Export folder: reports/"]
         self.report_text.delete("1.0","end"); self.report_text.insert("1.0","\n".join(lines))
 
     def export_all_reports(self):
-        resources=read_csv("resources.csv",RESOURCE_HEADERS); complaints=read_csv("complaints.csv",COMPLAINT_HEADERS); usage=read_csv("usage.csv",USAGE_HEADERS)
-        maintenance=[r for r in resources if r.get("status")=="Maintenance"]
-        open_complaints=[x for x in complaints if x.get("status") not in ("Resolved","Closed")]
-        exports=[("resource_report.csv",RESOURCE_HEADERS,resources),("complaint_report.csv",COMPLAINT_HEADERS,complaints),("usage_report.csv",USAGE_HEADERS,usage),("maintenance_report.csv",RESOURCE_HEADERS,maintenance),("open_complaints_report.csv",COMPLAINT_HEADERS,open_complaints)]
-        for filename,headers,rows in exports: self.export_report_csv(filename,headers,rows)
+        data=self.get_filtered_report_data()
+        if not data: return
+        resources,complaints,usage=data
+        maintenance=[r for r in resources if r.get("status")=="Maintenance"]; open_complaints=[x for x in complaints if x.get("status") not in ("Resolved","Closed")]
+        for filename,headers,rows in [("resource_report.csv",RESOURCE_HEADERS,resources),("complaint_report.csv",COMPLAINT_HEADERS,complaints),("usage_report.csv",USAGE_HEADERS,usage),("maintenance_report.csv",RESOURCE_HEADERS,maintenance),("open_complaints_report.csv",COMPLAINT_HEADERS,open_complaints)]:
+            self.export_report_csv(filename,headers,rows)
         resolved=sum(x.get("status") in ("Resolved","Closed") for x in complaints)
-        headers=["report_date","total_resources","available","in_use","maintenance","out_of_service","total_complaints","open_complaints","resolved_or_closed","resolution_rate_percent","total_usage_records"]
-        summary={"report_date":datetime.now().strftime("%Y-%m-%d"),"total_resources":len(resources),"available":sum(r.get("status")=="Available" for r in resources),"in_use":sum(r.get("status")=="In Use" for r in resources),"maintenance":len(maintenance),"out_of_service":sum(r.get("status")=="Out of Service" for r in resources),"total_complaints":len(complaints),"open_complaints":len(open_complaints),"resolved_or_closed":resolved,"resolution_rate_percent":f"{resolved/len(complaints)*100:.1f}" if complaints else "0.0","total_usage_records":len(usage)}
+        headers=["report_date","from_date","to_date","resource_filter","status_filter","priority_filter","total_resources","available","in_use","maintenance","out_of_service","total_complaints","open_complaints","resolved_or_closed","resolution_rate_percent","total_usage_records"]
+        summary={"report_date":datetime.now().strftime("%Y-%m-%d"),"from_date":self.report_from.get(),"to_date":self.report_to.get(),"resource_filter":self.report_resource.get(),"status_filter":self.report_status.get(),"priority_filter":self.report_priority.get(),"total_resources":len(resources),"available":sum(r.get("status")=="Available" for r in resources),"in_use":sum(r.get("status")=="In Use" for r in resources),"maintenance":len(maintenance),"out_of_service":sum(r.get("status")=="Out of Service" for r in resources),"total_complaints":len(complaints),"open_complaints":len(open_complaints),"resolved_or_closed":resolved,"resolution_rate_percent":f"{resolved/len(complaints)*100:.1f}" if complaints else "0.0","total_usage_records":len(usage)}
         self.export_report_csv("dashboard_summary.csv",headers,[summary])
-        self.audit("REPORTS_EXPORTED","All reports exported to reports/")
+        self.audit("REPORTS_EXPORTED","Filtered reports exported")
         self.refresh_report_center()
-        messagebox.showinfo("Export Complete","All Smart Reports were generated successfully in the reports folder.")
+        messagebox.showinfo("Export Complete","Filtered reports were generated successfully in the reports folder.")
 
 
-        bar=tk.Frame(self.report_tab);bar.pack(fill="x",padx=15,pady=12);tk.Button(bar,text="Refresh Summary",command=self.refresh_report_summary,bg="#0b4f8a",fg="white",bd=0,padx=15,pady=8).pack(side="left");tk.Button(bar,text="Export CSV Reports",command=self.export_reports,padx=15,pady=7).pack(side="left",padx=8);self.report_text=tk.Text(self.report_tab,font=("Consolas",11),bg="white",fg="#12395b",bd=0,padx=20,pady=20);self.report_text.pack(fill="both",expand=True,padx=15,pady=10);self.refresh_report_summary()
-    def refresh_report_summary(self):
-        resources=read_csv("resources.csv",RESOURCE_HEADERS);complaints=read_csv("complaints.csv",COMPLAINT_HEADERS);usage=read_csv("usage.csv",USAGE_HEADERS);lines=["SMART CAMPUS UTILITY MANAGEMENT REPORT","="*58,f"Generated: {datetime.now():%Y-%m-%d %H:%M:%S}","",f"Total Resources: {len(resources)}"]
-        for st in RESOURCE_STATUSES:lines.append(f"{st}: {sum(r.get('status','')==st for r in resources)}")
-        lines+=["",f"Total Complaints: {len(complaints)}"]
-        for st in STATUSES:lines.append(f"{st}: {sum(c.get('status','')==st for c in complaints)}")
-        for p in PRIORITIES:lines.append(f"{p} priority: {sum(c.get('priority','')==p for c in complaints)}")
-        lines+=["",f"Usage Records: {len(usage)}",f"Maintenance schedules recorded: {sum(1 for r in resources if r.get('next_maintenance','').strip())}",""]
-        for r in resources:lines.append(f"{r.get('resource_id')} - {r.get('name')}: {sum(u.get('resource_id')==r.get('resource_id') for u in usage)} usage record(s)")
-        self.report_text.delete("1.0","end");self.report_text.insert("1.0","\n".join(lines))
-    def export_reports(self):
-        import csv
-        out=__import__("pathlib").Path("reports");out.mkdir(exist_ok=True)
-        for target,source,headers in (("resource_report.csv","resources.csv",RESOURCE_HEADERS),("complaint_report.csv","complaints.csv",COMPLAINT_HEADERS),("usage_report.csv","usage.csv",USAGE_HEADERS)):
-            rows=read_csv(source,headers)
-            with(out/target).open("w",newline="",encoding="utf-8") as f:w=csv.DictWriter(f,fieldnames=headers);w.writeheader();w.writerows(rows)
-        messagebox.showinfo("Export Complete","Three CSV reports were saved in the reports folder.")
-    def add_usage(self):
-        resources=read_csv("resources.csv",RESOURCE_HEADERS);available=[r for r in resources if r.get("status","Available")=="Available"]
-        if not available:messagebox.showwarning("No Available Resources","All resources are currently in use, under maintenance, or unavailable.");return
-        win=tk.Toplevel(self);win.title("Record Resource Usage");win.geometry("450x360");win.configure(bg="white");tk.Label(win,text="Resource",bg="white",font=("Segoe UI",10,"bold")).pack(anchor="w",padx=30,pady=(25,4));rm=tk.StringVar();ttk.Combobox(win,textvariable=rm,values=[f'{r.get("resource_id")} - {r.get("name")}' for r in available],state="readonly").pack(fill="x",padx=30);tk.Label(win,text="Purpose",bg="white",font=("Segoe UI",10,"bold")).pack(anchor="w",padx=30,pady=(15,4));purpose=tk.Entry(win,font=("Segoe UI",11));purpose.pack(fill="x",padx=30,ipady=7);tk.Label(win,text="Duration",bg="white",font=("Segoe UI",10,"bold")).pack(anchor="w",padx=30,pady=(15,4));duration=tk.Entry(win,font=("Segoe UI",11));duration.pack(fill="x",padx=30,ipady=7)
-        def save():
-            if not rm.get() or not purpose.get().strip():messagebox.showwarning("Required","Complete the fields.",parent=win);return
-            rows=read_csv("usage.csv",USAGE_HEADERS);nums=[int(r.get("usage_id","")[1:]) for r in rows if r.get("usage_id","").startswith("U") and r.get("usage_id","")[1:].isdigit()];uid=f"U{max(nums,default=0)+1:03d}";rid=rm.get().split(" - ",1)[0]
-            append_csv("usage.csv",USAGE_HEADERS,{"usage_id":uid,"resource_id":rid,"used_by":self.user.name,"purpose":purpose.get().strip(),"date":datetime.now().strftime("%Y-%m-%d"),"duration":duration.get().strip()})
-            for r in resources:
-                if r.get("resource_id")==rid:r["status"]="In Use"
-            rewrite_csv("resources.csv",RESOURCE_HEADERS,resources);self.audit("USAGE_RECORDED",uid);win.destroy();self.refresh_usage();self.refresh_resources();self.refresh_analytics();self.refresh_alerts();self.refresh_audit()
-        tk.Button(win,text="Save Usage",command=save,bg="#0b4f8a",fg="white",bd=0,padx=20,pady=9).pack(pady=25)
-
-if __name__=="__main__":SmartCampusApp().mainloop()
