@@ -222,3 +222,23 @@ Version 27 adds:
 - Priority Action Center
 - Executive intelligence report
 - Cross-module decision support combining resources, reservations, usage, maintenance, complaints and forecasting
+
+
+## Version 28 — AI Campus Command Center & Automated Decision Intelligence
+
+Version 28 adds:
+- Central AI Campus Command Center
+- Natural-language-style campus queries
+- Resource status queries
+- Maintenance attention queries
+- Resource utilization queries
+- Department demand queries
+- Maintenance cost analysis queries
+- Complaint and issue summaries
+- Reservation summaries
+- Demand forecast queries
+- Resource health/risk queries
+- Executive campus summary queries
+- Quick-action question buttons
+- Conversational query history
+- Audit logging for Command Center queries
