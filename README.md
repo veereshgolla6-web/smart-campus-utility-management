@@ -2,6 +2,16 @@
 
 A Python/Tkinter campus utility management system for resources, maintenance, complaints, usage, reports, analytics, alerts, backups, audit history, administration, and dashboard monitoring.
 
+## Version 14 — Advanced Search, Filters & Date-Range Reporting
+- From/to date filtering with validation
+- Resource filtering
+- Status filtering
+- Complaint priority filtering
+- Combined filters across resources, complaints and usage
+- Clear Filters control
+- Filtered report counts
+- Filtered CSV exports and dashboard summary
+
 ## Version 13 — Smart Reports & Export Center
 - Dedicated Smart Reports & Export Center
 - One-click export of resource, complaint, usage, maintenance and open-complaint reports
