@@ -157,6 +157,9 @@ class SmartCampusApp(tk.Tk):
         for row in reversed(audits[-15:]): lines.append(f"{row.get('timestamp','')} | {row.get('username','')} | {row.get('action','')} | {row.get('details','')}")
         self.admin_text.delete("1.0","end"); self.admin_text.insert("1.0","\n".join(lines))
 
+    def password_valid(self,password):
+        return len(password)>=8 and any(x.isupper() for x in password) and any(x.islower() for x in password) and any(x.isdigit() for x in password)
+
     def change_password(self):
         win=tk.Toplevel(self); win.title("Change Password"); win.geometry("420x330"); win.configure(bg="white"); fields={}
         for label,key in (("Current Password","current"),("New Password","new"),("Confirm New Password","confirm")):
@@ -164,7 +167,7 @@ class SmartCampusApp(tk.Tk):
         def save():
             cur=fields["current"].get(); new=fields["new"].get(); confirm=fields["confirm"].get()
             if cur!=self.user.password: messagebox.showerror("Invalid Password","Current password is incorrect.",parent=win); return
-            if len(new)<6: messagebox.showwarning("Weak Password","New password must contain at least 6 characters.",parent=win); return
+            if not self.password_valid(new): messagebox.showwarning("Weak Password","Use at least 8 characters with uppercase, lowercase and a number.",parent=win); return
             if new!=confirm: messagebox.showwarning("Mismatch","New passwords do not match.",parent=win); return
             rows=read_csv("users.csv",USER_HEADERS)
             for row in rows:
