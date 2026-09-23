@@ -2,6 +2,14 @@
 
 A Python/Tkinter campus utility management system for resources, maintenance, complaints, usage, reports, analytics, alerts, backups, audit history, administration, and dashboard monitoring.
 
+## Version 13 — Smart Reports & Export Center
+- Dedicated Smart Reports & Export Center
+- One-click export of resource, complaint, usage, maintenance and open-complaint reports
+- Dashboard summary export with resolution rate and live totals
+- CSV exports stored in the reports folder
+- Report center record counts and refresh control
+- Report exports recorded in the audit trail
+
 ## Version 12 — Advanced Visual Analytics
 - Native Tkinter charts with no external dependencies
 - Resource utilization/status chart
